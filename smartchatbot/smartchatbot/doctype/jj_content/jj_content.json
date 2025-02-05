@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-02-05 15:36:17.953273",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "content_type",
+  "product_category",
+  "industry",
+  "column_break_dazf",
+  "image"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Content Type",
+   "options": "JJ Content Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "reqd": 1
+  },
+  {
+   "fieldname": "product_category",
+   "fieldtype": "Table MultiSelect",
+   "label": "Product Category",
+   "options": "JJ Content Product Category",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_dazf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "industry",
+   "fieldtype": "Table MultiSelect",
+   "label": "Industry",
+   "options": "JJ Content Industry",
+   "reqd": 1
+  }
+ ],
+ "image_field": "image",
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-02-05 15:47:33.342867",
+ "modified_by": "Administrator",
+ "module": "Smartchatbot",
+ "name": "JJ Content",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
