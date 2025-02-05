@@ -12,7 +12,11 @@
   "product_category",
   "industry",
   "column_break_qmnd",
-  "image"
+  "image",
+  "description",
+  "active",
+  "hash",
+  "hash_ai"
  ],
  "fields": [
   {
@@ -59,13 +63,34 @@
    "fieldname": "image",
    "fieldtype": "Attach Image",
    "label": "Image"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active?"
+  },
+  {
+   "fieldname": "hash",
+   "fieldtype": "Data",
+   "label": "Hash"
+  },
+  {
+   "fieldname": "hash_ai",
+   "fieldtype": "Data",
+   "label": "Hash Ai"
   }
  ],
  "image_field": "image",
  "index_web_pages_for_search": 1,
  "links": [],
  "make_attachments_public": 1,
- "modified": "2025-02-05 16:23:10.244151",
+ "modified": "2025-02-05 16:37:54.660521",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Product",
