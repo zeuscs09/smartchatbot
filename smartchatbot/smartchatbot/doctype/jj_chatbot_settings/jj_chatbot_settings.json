@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-02-05 16:41:20.002055",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "ai_api_endpoint",
+  "ai_api_token",
+  "qdrant_section",
+  "qdrant_endpoint",
+  "qdrant_token"
+ ],
+ "fields": [
+  {
+   "fieldname": "ai_api_endpoint",
+   "fieldtype": "Data",
+   "label": "AI Api Endpoint"
+  },
+  {
+   "fieldname": "ai_api_token",
+   "fieldtype": "Password",
+   "label": "AI Api Token"
+  },
+  {
+   "fieldname": "qdrant_section",
+   "fieldtype": "Section Break",
+   "label": "Qdrant"
+  },
+  {
+   "fieldname": "qdrant_endpoint",
+   "fieldtype": "Data",
+   "label": "Qdrant Endpoint"
+  },
+  {
+   "fieldname": "qdrant_token",
+   "fieldtype": "Password",
+   "label": "Qdrant Token"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-02-05 16:45:47.495519",
+ "modified_by": "Administrator",
+ "module": "Smartchatbot",
+ "name": "JJ Chatbot Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
