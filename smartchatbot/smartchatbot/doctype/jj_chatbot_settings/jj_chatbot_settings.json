@@ -9,7 +9,11 @@
   "ai_api_token",
   "qdrant_section",
   "qdrant_endpoint",
-  "qdrant_token"
+  "qdrant_token",
+  "line_oa_section",
+  "line_channel_id",
+  "line_secret",
+  "line_access_token"
  ],
  "fields": [
   {
@@ -36,12 +40,32 @@
    "fieldname": "qdrant_token",
    "fieldtype": "Password",
    "label": "Qdrant Token"
+  },
+  {
+   "fieldname": "line_oa_section",
+   "fieldtype": "Section Break",
+   "label": "Line OA"
+  },
+  {
+   "fieldname": "line_channel_id",
+   "fieldtype": "Data",
+   "label": "Line Channel Id"
+  },
+  {
+   "fieldname": "line_secret",
+   "fieldtype": "Data",
+   "label": "Line Secret"
+  },
+  {
+   "fieldname": "line_access_token",
+   "fieldtype": "Password",
+   "label": "Line Access Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-05 16:45:47.495519",
+ "modified": "2025-02-05 16:53:09.667180",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chatbot Settings",
