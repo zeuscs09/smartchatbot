@@ -1,12 +1,48 @@
 import frappe
 from frappe import _
-from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
-from linebot.models import (
-    MessageEvent, 
-    TextMessage, 
-    TextSendMessage
+from linebot.v3 import (
+    WebhookHandler
 )
+from linebot.v3.exceptions import (
+    InvalidSignatureError
+)
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    ReplyMessageRequest,
+    TextMessage
+)
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent
+)
+
+def create_message_handler(doc, handler, configuration):
+    @handler.add(MessageEvent, message=TextMessageContent)
+    def handle_message(event):
+        # อัพเดทข้อมูลเพิ่มเติม
+        doc.message_id = event.message.id
+        doc.user_id = event.source.user_id
+        doc.message_type = "text"
+        doc.message_text = event.message.text
+        
+        # ส่งข้อความตอบกลับ
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            reply_text = f"Hello, User ID: {event.source.user_id}"
+            line_bot_api.reply_message_with_http_info(
+                ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=reply_text)]
+                )
+            )
+            
+            # บันทึกข้อความตอบกลับพร้อมเวลา
+            doc.response_text = reply_text
+            doc.response_time = frappe.utils.now_datetime()
+            doc.save(ignore_permissions=True)
+    return handle_message
 
 @frappe.whitelist(allow_guest=True)
 def webhook():
@@ -15,10 +51,12 @@ def webhook():
     
     # รับค่า signature และ body
     signature = frappe.get_request_header("X-Line-Signature")
+    if not signature:
+        frappe.throw(_("Missing X-Line-Signature header"))
+        
     body = frappe.request.get_data(as_text=True)
-    
-    frappe.log_error(title="LINE Webhook Body", message=f"LINE Webhook: {body}")
-    frappe.log_error(title="LINE Webhook Signature", message=f"LINE Webhook: {signature}")
+    if not body:
+        frappe.throw(_("Empty request body"))
     
     try:
         # ดึงการตั้งค่าจาก JJ Chatbot Settings
@@ -35,32 +73,15 @@ def webhook():
         doc.insert(ignore_permissions=True)
         
         # ตั้งค่า LINE API
-        line_bot_api = LineBotApi(line_token)
+        configuration = Configuration(access_token=line_token)
         handler = WebhookHandler(line_secret)
+        
+        # สร้าง handler function
+        handle_message = create_message_handler(doc, handler, configuration)
         
         # ตรวจสอบ signature
         handler.handle(body, signature)
         
-        # กำหนด handler function
-        @handler.add(MessageEvent, message=TextMessage)
-        def handle_message(event):
-            # อัพเดทข้อมูลเพิ่มเติม
-            doc.message_id = event.message.id
-            doc.user_id = event.source.user_id
-            doc.message_type = "text"
-            doc.message_text = event.message.text
-            
-            # ส่งข้อความตอบกลับ
-            reply_text = f"Hello, User ID: {event.source.user_id}"
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=reply_text)
-            )
-            
-            # บันทึกข้อความตอบกลับพร้อมเวลา
-            doc.response_text = reply_text
-            doc.response_time = frappe.utils.now_datetime()
-            doc.save(ignore_permissions=True)
     except InvalidSignatureError:
         frappe.log_error(title="LINE Webhook Error", message=f"Invalid signature")
     except Exception as e:
