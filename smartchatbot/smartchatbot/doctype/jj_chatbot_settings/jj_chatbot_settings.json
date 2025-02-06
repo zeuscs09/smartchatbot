@@ -7,6 +7,9 @@
  "field_order": [
   "ai_api_endpoint",
   "ai_api_token",
+  "column_break_wxxu",
+  "ai_model",
+  "ai_system_instruction",
   "qdrant_section",
   "qdrant_endpoint",
   "qdrant_token",
@@ -60,12 +63,26 @@
    "fieldname": "line_access_token",
    "fieldtype": "Password",
    "label": "Line Access Token"
+  },
+  {
+   "fieldname": "column_break_wxxu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "Ai Model"
+  },
+  {
+   "fieldname": "ai_system_instruction",
+   "fieldtype": "Small Text",
+   "label": "Ai System instruction"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-05 16:53:09.667180",
+ "modified": "2025-02-06 14:18:52.915994",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chatbot Settings",

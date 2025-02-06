@@ -1,0 +1,9 @@
+import frappe
+
+@frappe.whitelist(allow_guest=True)
+def ai_test(message=None):
+    from smartchatbot.utils.aiagent import reply_message
+    if not message:
+        return "กรุณาใส่ข้อความที่ต้องการ"
+    return reply_message(message)
+

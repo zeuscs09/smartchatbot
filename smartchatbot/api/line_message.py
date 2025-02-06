@@ -17,31 +17,50 @@ from linebot.v3.webhooks import (
     MessageEvent,
     TextMessageContent
 )
+from smartchatbot.utils.aiagent import reply_message
 
 def create_message_handler(doc, handler, configuration):
     @handler.add(MessageEvent, message=TextMessageContent)
     def handle_message(event):
-        # อัพเดทข้อมูลเพิ่มเติม
-        doc.message_id = event.message.id
-        doc.user_id = event.source.user_id
-        doc.message_type = "text"
-        doc.message_text = event.message.text
-        
-        # ส่งข้อความตอบกลับ
-        with ApiClient(configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            reply_text = f"Hello, User ID: {event.source.user_id}"
-            line_bot_api.reply_message_with_http_info(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_text)]
-                )
-            )
+        try:
+            frappe.log_error(title="LINE Debug", message=f"Starting handle_message with event: {event}")
             
-            # บันทึกข้อความตอบกลับพร้อมเวลา
-            doc.response_text = reply_text
-            doc.response_time = frappe.utils.now_datetime()
-            doc.save(ignore_permissions=True)
+            # อัพเดทข้อมูลเพิ่มเติม
+            doc.message_id = event.message.id
+            doc.user_id = event.source.user_id
+            doc.message_type = "text"
+            doc.message_text = event.message.text
+            
+            # ใช้ ChatGPT ตอบกลับ
+            user_message = event.message.text
+            reply_text = reply_message(user_message)
+            
+            # ส่งข้อความตอบกลับ
+            with ApiClient(configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                
+                frappe.log_error(title="LINE Debug", 
+                               message=f"Attempting to reply with text: {reply_text}")
+                
+                response = line_bot_api.reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=reply_text)]
+                    )
+                )
+                
+                # บันทึกข้อความตอบกลับพร้อมเวลา
+                doc.response_text = reply_text
+                doc.response_time = frappe.utils.now_datetime()
+                doc.save(ignore_permissions=True)
+                
+                frappe.log_error(title="LINE Debug", message="Message handled successfully")
+                
+        except Exception as e:
+            frappe.log_error(title="LINE Message Handler Error", 
+                           message=f"Error in handle_message: {str(e)}\nEvent: {event}")
+            raise e
+            
     return handle_message
 
 @frappe.whitelist(allow_guest=True)
