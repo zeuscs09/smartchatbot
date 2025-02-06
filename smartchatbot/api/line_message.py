@@ -17,6 +17,9 @@ def webhook():
     signature = frappe.get_request_header("X-Line-Signature")
     body = frappe.request.get_data(as_text=True)
     
+    frappe.log_error(title="LINE Webhook", message=f"LINE Webhook: {body}")
+    frappe.log_error(title="LINE Webhook", message=f"LINE Webhook: {signature}")
+    
     try:
         # ดึงการตั้งค่าจาก JJ Chatbot Settings
         settings = frappe.get_doc("JJ Chatbot Settings")
@@ -58,7 +61,7 @@ def webhook():
             doc.save(ignore_permissions=True)
         
     except InvalidSignatureError:
-        frappe.throw(_("Invalid signature"))
+        frappe.log_error(title="LINE Webhook Error", message=f"Invalid signature")
     except Exception as e:
         frappe.log_error(title="LINE Webhook Error", message=f"LINE Webhook Error: {str(e)}")
         return "Error"
