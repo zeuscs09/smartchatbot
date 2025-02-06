@@ -20,8 +20,8 @@ def webhook():
     try:
         # ดึงการตั้งค่าจาก JJ Chatbot Settings
         settings = frappe.get_doc("JJ Chatbot Settings")
-        line_secret = settings.get_password("line_channel_secret")
-        line_token = settings.get_password("line_channel_access_token")
+        line_secret = settings.line_secret
+        line_token = settings.get_password("line_access_token")
         
         # ตั้งค่า LINE API
         line_bot_api = LineBotApi(line_token)
@@ -35,12 +35,13 @@ def webhook():
         def handle_message(event):
             # บันทึกข้อความลง DocType
             doc = frappe.get_doc({
-                "doctype": "JJ Line Message",
+                "doctype": "JJ Line Webhook Log",
                 "message_id": event.message.id,
                 "user_id": event.source.user_id,
                 "message_type": "text",
                 "message_text": event.message.text,
-                "timestamp": frappe.utils.now_datetime()
+                "timestamp": frappe.utils.now_datetime(),
+                "payload": body
             })
             doc.insert(ignore_permissions=True)
             
@@ -51,8 +52,9 @@ def webhook():
                 TextSendMessage(text=reply_text)
             )
             
-            # บันทึกข้อความตอบกลับ
+            # บันทึกข้อความตอบกลับพร้อมเวลา
             doc.response_text = reply_text
+            doc.response_time = frappe.utils.now_datetime()
             doc.save(ignore_permissions=True)
         
     except InvalidSignatureError:

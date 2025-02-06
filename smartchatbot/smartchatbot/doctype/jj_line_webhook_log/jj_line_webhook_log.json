@@ -8,8 +8,12 @@
   "message_id",
   "user_id",
   "message_type",
+  "column_break_buou",
   "message_text",
   "timestamp",
+  "response_text",
+  "response_time",
+  "section_break_coxy",
   "payload"
  ],
  "fields": [
@@ -42,11 +46,29 @@
    "fieldname": "payload",
    "fieldtype": "Code",
    "label": "Payload"
+  },
+  {
+   "fieldname": "column_break_buou",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "response_text",
+   "fieldtype": "Long Text",
+   "label": "Response Text"
+  },
+  {
+   "fieldname": "response_time",
+   "fieldtype": "Datetime",
+   "label": "Response Time"
+  },
+  {
+   "fieldname": "section_break_coxy",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-06 09:55:54.371527",
+ "modified": "2025-02-06 12:44:31.285686",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Line Webhook Log",
