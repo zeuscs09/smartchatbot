@@ -17,8 +17,8 @@ def webhook():
     signature = frappe.get_request_header("X-Line-Signature")
     body = frappe.request.get_data(as_text=True)
     
-    frappe.log_error(title="LINE Webhook", message=f"LINE Webhook: {body}")
-    frappe.log_error(title="LINE Webhook", message=f"LINE Webhook: {signature}")
+    frappe.log_error(title="LINE Webhook Body", message=f"LINE Webhook: {body}")
+    frappe.log_error(title="LINE Webhook Signature", message=f"LINE Webhook: {signature}")
     
     try:
         # ดึงการตั้งค่าจาก JJ Chatbot Settings
@@ -32,11 +32,12 @@ def webhook():
         
         # ตรวจสอบ signature
         handler.handle(body, signature)
-        
+        gotohandle = False
         # กำหนด handler function
         @handler.add(MessageEvent, message=TextMessage)
         def handle_message(event):
             # บันทึกข้อความลง DocType
+            gotohandle = True
             doc = frappe.get_doc({
                 "doctype": "JJ Line Webhook Log",
                 "message_id": event.message.id,
@@ -59,7 +60,8 @@ def webhook():
             doc.response_text = reply_text
             doc.response_time = frappe.utils.now_datetime()
             doc.save(ignore_permissions=True)
-        
+        if not gotohandle:
+            frappe.log_error(title="LINE Webhook Error", message=f"No handler found")
     except InvalidSignatureError:
         frappe.log_error(title="LINE Webhook Error", message=f"Invalid signature")
     except Exception as e:
