@@ -38,76 +38,91 @@ def create_message_handler(doc, handler, configuration):
             response = reply_message(user_message, doc.user_id)
             
             messages = []
-            if isinstance(response, dict) and 'products' in response:
-                # สร้าง Flex Message สำหรับแสดงสินค้า
-                flex_contents = {
-                    "type": "carousel",
-                    "contents": []
-                }
-                
-                for product in response['products']:
-                    bubble = {
-                        "type": "bubble",
-                        "hero": {
-                            "type": "image",
-                            "url": product['image_url'],
-                            "size": "full",
-                            "aspectRatio": "20:13",
-                            "aspectMode": "cover"
-                        },
-                        "body": {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "text",
-                                    "text": product['title'],
-                                    "weight": "bold",
-                                    "size": "md",
-                                    "wrap": True
-                                },
-                                {
-                                    "type": "text",
-                                    "text": f"ราคา: {product['price']} บาท",
-                                    "size": "sm",
-                                    "color": "#555555"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": product['description'],
-                                    "size": "xs",
-                                    "color": "#555555",
-                                    "wrap": True,
-                                    "maxLines": 5
-                                }
-                            ]
-                        }
-                    }
-                    flex_contents["contents"].append(bubble)
-                
-                messages.append(
-                    FlexMessage(
-                        alt_text="รายการสินค้า",
-                        contents=FlexContainer.from_dict(flex_contents)
-                    )
-                )
-                
-                # เพิ่มข้อความอธิบายถ้ามี
-                if 'text' in response:
+            if isinstance(response, dict):
+                # แสดง text message ก่อนเสมอถ้ามี
+                if 'text' in response and response['text']:
                     messages.append(TextMessage(text=response['text']))
+                    reply_text = response['text']
+                
+                # ถ้ามี products และไม่ใช่ array ว่าง จึงแสดง flex message
+                if 'products' in response and response['products']:
+                    flex_contents = {
+                        "type": "carousel",
+                        "contents": []
+                    }
                     
-                reply_text = response.get('text', 'ดูรายการสินค้าด้านบนค่ะ')
+                    for product in response['products']:
+                        # ตรวจสอบและแปลง image URL
+                        image_url = product.get('image_url', '')
+                        if image_url and not image_url.startswith('http'):
+                            image_url = frappe.utils.get_url(image_url)
+                        
+                        bubble = {
+                            "type": "bubble",
+                            "hero": {
+                                "type": "image",
+                                "url": image_url,
+                                "size": "full",
+                                "aspectRatio": "20:13",
+                                "aspectMode": "cover"
+                            },
+                            "body": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": product.get('title', ''),
+                                        "weight": "bold",
+                                        "size": "md",
+                                        "wrap": True
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": f"฿{product.get('price', 0):,.0f}",
+                                        "size": "xl",
+                                        "weight": "bold",
+                                        "color": "#D53600"
+                                    }
+                                ]
+                            },
+                            "footer": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "button",
+                                        "action": {
+                                            "type": "uri",
+                                            "label": "ดูรายละเอียด",
+                                            "uri": f"{frappe.utils.get_url()}/line/products/{product.get('name', '')}"
+                                        },
+                                        "style": "primary"
+                                    }
+                                ]
+                            }
+                        }
+                        flex_contents["contents"].append(bubble)
+                    
+                    if flex_contents["contents"]:
+                        messages.append(
+                            FlexMessage(
+                                alt_text="รายการสินค้า",
+                                contents=FlexContainer.from_dict(flex_contents)
+                            )
+                        )
+                elif not messages:  # ถ้าไม่มีทั้ง text และ products
+                    messages.append(TextMessage(text="ขออภัยค่ะ ไม่พบข้อมูลที่ต้องการ"))
+                    reply_text = "ไม่พบข้อมูล"
             else:
-                messages.append(TextMessage(text=response))
-                reply_text = response
+                messages.append(TextMessage(text=str(response)))
+                reply_text = str(response)
             
             # ส่งข้อความตอบกลับ
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
-                
-                frappe.log_error(title="LINE Debug", 
-                               message=f"Attempting to reply with messages: {messages}")
-                
                 response = line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,

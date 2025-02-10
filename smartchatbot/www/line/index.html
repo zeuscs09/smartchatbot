@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if product %}{{ product.title }}{% else %}ข้อมูลสินค้า{% endif %}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .product-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .product-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .product-price {
+            font-size: 28px;
+            font-weight: bold;
+            color: #D53600;
+            margin-bottom: 20px;
+        }
+        .product-category {
+            display: inline-block;
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .product-description {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            white-space: pre-line;
+        }
+        .industries {
+            margin-bottom: 20px;
+        }
+        .industry-tag {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .contact-button {
+            display: block;
+            background-color: #28a745;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .error-message {
+            text-align: center;
+            color: #dc3545;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% if error %}
+            <div class="error-message">
+                <p>{{ error }}</p>
+            </div>
+        {% elif product %}
+            {% if product.image %}
+            <img src="{{ product.image }}" alt="{{ product.title }}" class="product-image">
+            {% endif %}
+
+            <h1 class="product-title">{{ product.title }}</h1>
+            
+            <div class="product-price">
+                ฿{{ "{:,.0f}".format(product.price or 0) }}
+            </div>
+
+            {% if product.product_category %}
+            <div class="product-category">
+                {{ product.product_category }}
+            </div>
+            {% endif %}
+
+            {% if product.industry %}
+            <div class="industries">
+                {% for ind in product.industry %}
+                <span class="industry-tag">{{ ind.industry }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if product.description %}
+            <div class="product-description">
+                {{ product.description }}
+            </div>
+            {% endif %}
+
+            <a href="https://line.me/R/oaMessage/{{ line_id }}/?สอบถามรายละเอียด {{ product.name }}" 
+               class="contact-button">
+                สอบถามรายละเอียดเพิ่มเติม
+            </a>
+        {% endif %}
+    </div>
+</body>
+</html>
