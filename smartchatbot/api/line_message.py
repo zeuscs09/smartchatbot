@@ -36,7 +36,7 @@ def create_message_handler(doc, handler, configuration):
             # ใช้ ChatGPT ตอบกลับ
             user_message = event.message.text
             response = reply_message(user_message, doc.user_id)
-            
+            frappe.log_error(title="LINE Debug", message=f"Response: {response}")
             messages = []
             if isinstance(response, dict):
                 # ส่ง summary_text ก่อนเสมอถ้ามี

@@ -429,7 +429,7 @@ Note: Keep it within 2 lines, no markdown formatting"""
             "timestamp": str(frappe.utils.now_datetime())
         })
         chat_history.insert(ignore_permissions=True)
-
+        
         return {
             "text": final_response["content"],
             "summary_text": summary_response["content"],
