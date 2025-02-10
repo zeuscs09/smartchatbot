@@ -5,10 +5,13 @@ import frappe
 from frappe.model.document import Document
 import hashlib
 import json
-
+import uuid
 
 class JJProduct(Document):
 	def validate(self):
+     
+		if not self.uuid:  # เพิ่มการตรวจสอบและสร้าง UUID
+			self.uuid = str(uuid.uuid4())
 		self.build_content_and_hash()
 	
 	def build_content_and_hash(self):

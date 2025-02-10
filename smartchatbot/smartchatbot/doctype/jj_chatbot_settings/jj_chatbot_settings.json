@@ -7,6 +7,7 @@
  "field_order": [
   "ai_api_endpoint",
   "ai_api_token",
+  "ai_embedding_model",
   "column_break_wxxu",
   "ai_model",
   "ai_system_instruction",
@@ -77,12 +78,17 @@
    "fieldname": "ai_system_instruction",
    "fieldtype": "Small Text",
    "label": "Ai System instruction"
+  },
+  {
+   "fieldname": "ai_embedding_model",
+   "fieldtype": "Data",
+   "label": "Ai Embed vector model"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-06 14:18:52.915994",
+ "modified": "2025-02-10 12:23:20.002818",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chatbot Settings",

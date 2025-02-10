@@ -1,0 +1,82 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-02-10 14:35:18.708597",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user_message",
+  "timestamp",
+  "section_break_jsaz",
+  "intent_analysis",
+  "section_break_zaon",
+  "search_results",
+  "section_break_babl",
+  "ai_response"
+ ],
+ "fields": [
+  {
+   "fieldname": "user_message",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "User Message"
+  },
+  {
+   "fieldname": "timestamp",
+   "fieldtype": "Datetime",
+   "label": "Timestamp"
+  },
+  {
+   "fieldname": "section_break_jsaz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "intent_analysis",
+   "fieldtype": "JSON",
+   "label": "Intent Analysis"
+  },
+  {
+   "fieldname": "section_break_zaon",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "search_results",
+   "fieldtype": "JSON",
+   "label": "Search Results"
+  },
+  {
+   "fieldname": "section_break_babl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "ai_response",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "AI Response"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-02-10 14:47:36.036758",
+ "modified_by": "Administrator",
+ "module": "Smartchatbot",
+ "name": "JJ Chat History",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
