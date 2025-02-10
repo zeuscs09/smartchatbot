@@ -16,7 +16,9 @@
   "description",
   "active",
   "hash",
-  "hash_ai"
+  "hash_ai",
+  "section_break_irty",
+  "content"
  ],
  "fields": [
   {
@@ -78,19 +80,31 @@
   {
    "fieldname": "hash",
    "fieldtype": "Data",
-   "label": "Hash"
+   "label": "Hash",
+   "read_only": 1
   },
   {
    "fieldname": "hash_ai",
    "fieldtype": "Data",
-   "label": "Hash Ai"
+   "label": "Hash Ai",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_irty",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Code",
+   "label": "Content",
+   "read_only": 1
   }
  ],
  "image_field": "image",
  "index_web_pages_for_search": 1,
  "links": [],
  "make_attachments_public": 1,
- "modified": "2025-02-05 16:37:54.660521",
+ "modified": "2025-02-06 16:05:18.882348",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Product",
