@@ -166,7 +166,8 @@ def reply_message(message: str, session_id: str) -> Dict:
     ตอบกลับข้อความโดยใช้ session_id ที่ได้รับจากภายนอก
     Returns:
         Dict: {
-            "text": str,  # ข้อความตอบกลับ
+            "text": str,  # ข้อความตอบกลับแบบละเอียด
+            "summary_text": str,  # ข้อความสรุปสั้นๆ
             "products": List[Dict]  # array ของสินค้าที่เกี่ยวข้อง
         }
     """
@@ -207,6 +208,7 @@ def reply_message(message: str, session_id: str) -> Dict:
             chat_history.insert(ignore_permissions=True)
             return {
                 "text": ai_response["content"],
+                "summary_text": "",
                 "products": []
             }
             
@@ -276,13 +278,51 @@ def reply_message(message: str, session_id: str) -> Dict:
                 context += f"รูปภาพ: {payload['image_url']}\n"
         
         if products:
-            summary_text="ตอบแบบสรุปสินค้า";
+            instruction = """You are a product expert. Please answer questions following these guidelines:
+1. Be concise and to the point
+2. For price-related questions, specify exact prices
+3. For multiple products, list them with bullet points
+4. Use friendly and polite Thai language
+5. Include image links when asked about product images
+6. For products under 100 baht, emphasize value for money
+7. For products with multiple sizes, recommend based on usage
+8. Do not use any markdown formatting
+9. Response must be in Thai language"""
+
+            summary_instruction = """Summarize the product information in Thai language:
+1. Number of relevant products
+2. Price range (if any)
+3. Key product features
+Note: Keep it within 2 lines, no markdown formatting"""
+
         else:
-            summary_text="";
-        # สร้างคำตอบพร้อม session context
+            instruction = """You are an information expert. Please follow these guidelines:
+1. Be concise and to the point
+2. Use friendly and polite Thai language
+3. If no exact match found, suggest alternative questions
+4. Provide additional useful recommendations
+5. Do not use any markdown formatting
+6. Response must be in Thai language"""
+
+            summary_instruction = """Summarize the answer in Thai language:
+1. Keep it within 1 line
+2. No markdown formatting
+3. Maintain friendly tone"""
+
+        # สร้างคำตอบละเอียด
         final_response = agent.ai_client.chat_completion(
             messages=[
-                {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}\n\n{summary_text}"}
+                {"role": "system", "content": instruction },
+                {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}"}
+            ],
+            session_id=session_id
+        )
+
+        # สร้างคำตอบแบบสรุป
+        summary_response = agent.ai_client.chat_completion(
+            messages=[
+                {"role": "system", "content": summary_instruction},
+                {"role": "user", "content": f"คำตอบที่ต้องสรุป:\n{final_response['content']}"}
             ],
             session_id=session_id
         )
@@ -298,6 +338,7 @@ def reply_message(message: str, session_id: str) -> Dict:
 
         return {
             "text": final_response["content"],
+            "summary_text": summary_response["content"],
             "products": products
         }
         
@@ -305,6 +346,7 @@ def reply_message(message: str, session_id: str) -> Dict:
         frappe.log_error(f"Error in reply_message: {str(e)}")
         return {
             "text": "ขออภัย เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง",
+            "summary_text": "เกิดข้อผิดพลาด",
             "products": []
         }
     

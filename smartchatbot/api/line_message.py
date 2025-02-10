@@ -39,12 +39,16 @@ def create_message_handler(doc, handler, configuration):
             
             messages = []
             if isinstance(response, dict):
-                # แสดง text message ก่อนเสมอถ้ามี
-                if 'text' in response and response['text']:
+                # ส่ง summary_text ก่อนเสมอถ้ามี
+                if 'summary_text' in response and response['summary_text']:
+                    messages.append(TextMessage(text=response['summary_text']))
+                    reply_text = response['summary_text']
+                # ถ้าไม่มี summary_text จึงใช้ text
+                elif 'text' in response and response['text']:
                     messages.append(TextMessage(text=response['text']))
                     reply_text = response['text']
                 
-                # ถ้ามี products และไม่ใช่ array ว่าง จึงแสดง flex message
+                # ถ้ามี products จึงแสดง flex message
                 if 'products' in response and response['products']:
                     flex_contents = {
                         "type": "carousel",

@@ -5,7 +5,7 @@ def ai_test(message=None):
     from smartchatbot.utils.aiagent import reply_message
     if not message:
         return "กรุณาใส่ข้อความที่ต้องการ"
-    session_id = "9cf855f5-43ac-414d-a323-445852d9d748"
+    session_id = "46826012-67e4-427f-8f41-4222a40fc069"
     return reply_message(message, session_id)
 
 @frappe.whitelist()
