@@ -48,7 +48,7 @@ def create_message_handler(doc, handler, configuration):
                     messages.append(TextMessage(text=response['text']))
                     reply_text = response['text']
                 
-                # ถ้ามี products จึงแสดง flex message
+                # ถ้ามี products จึงแสดง flex message สำหรับสินค้า
                 if 'products' in response and response['products']:
                     flex_contents = {
                         "type": "carousel",
@@ -115,6 +115,69 @@ def create_message_handler(doc, handler, configuration):
                             FlexMessage(
                                 alt_text="รายการสินค้า",
                                 contents=FlexContainer.from_dict(flex_contents)
+                            )
+                        )
+                
+                # เพิ่ม flex message สำหรับ content
+                if 'content' in response and response['content']:
+                    content_flex = {
+                        "type": "carousel",
+                        "contents": []
+                    }
+                    
+                    for content in response['content']:
+                        # ตรวจสอบและแปลง image URL
+                        image_url = content.get('image_url', '')
+                        if image_url and not image_url.startswith('http'):
+                            image_url = frappe.utils.get_url(image_url)
+                        
+                        bubble = {
+                            "type": "bubble",
+                            "hero": {
+                                "type": "image",
+                                "url": image_url,
+                                "size": "full",
+                                "aspectRatio": "20:13",
+                                "aspectMode": "cover"
+                            },
+                            "body": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "text",
+                                        "text": content.get('title', ''),
+                                        "weight": "bold",
+                                        "size": "md",
+                                        "wrap": True
+                                    }
+                                ]
+                            },
+                            "footer": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "button",
+                                        "action": {
+                                            "type": "uri",
+                                            "label": "ดูรายละเอียด",
+                                            "uri": f"{frappe.utils.get_url()}/line/content/{content.get('name', '')}"
+                                        },
+                                        "style": "primary"
+                                    }
+                                ]
+                            }
+                        }
+                        content_flex["contents"].append(bubble)
+                    
+                    if content_flex["contents"]:
+                        messages.append(
+                            FlexMessage(
+                                alt_text="บทความที่เกี่ยวข้อง",
+                                contents=FlexContainer.from_dict(content_flex)
                             )
                         )
                 elif not messages:  # ถ้าไม่มีทั้ง text และ products
