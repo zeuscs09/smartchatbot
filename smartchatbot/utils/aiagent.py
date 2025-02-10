@@ -184,7 +184,7 @@ def reply_message(message: str, session_id: str) -> Dict:
         
         # ใช้ search_text แทน original_question
         search_texts = [q['search_text'] for q in questions if q['type'] in ['product', 'content']]
-        questions_text = " ".join(search_texts) if search_texts else message
+        questions_text = " ".join(search_texts) 
 
         # สร้าง chat history
         chat_history = frappe.get_doc({
@@ -217,34 +217,109 @@ def reply_message(message: str, session_id: str) -> Dict:
             }
             
         # ถ้าไม่ใช่ greeting ค่อยทำการค้นหาข้อมูล
-        vector = agent.ai_client.get_embedding(questions_text)
+        vector = agent.qdrant.get_embedding(questions_text)
         
-        # # ค้นหาจากทั้ง content และ product
-        # search_results = {
-        #     "combined_search": {
-        #         "query": questions_text,
-        #         "product_results": [],
-        #         "content_results": [],
-        #         "timestamp": str(frappe.utils.now_datetime())
-        #     }
-        # }
+        # สร้าง filter conditions จาก price_condition
+        filter_conditions = None
+        price_conditions = [q.get('price_condition') for q in questions if q.get('price_condition')]
         
-        # ค้นหาจาก product และ content collection
-        product_results = agent.qdrant.client.search(
-            collection_name="jj_product",
+        if price_conditions:
+            conditions = []
+            for condition in price_conditions:
+                operator = condition.get('operator')
+                value = condition.get('value')
+                
+                if operator == '=':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            match=models.MatchValue(value=value)
+                        )
+                    )
+                elif operator == '<':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            range=models.Range(lt=value)
+                        )
+                    )
+                elif operator == '>':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            range=models.Range(gt=value)
+                        )
+                    )
+                elif operator == '<=':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            range=models.Range(lte=value)
+                        )
+                    )
+                elif operator == '>=':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            range=models.Range(gte=value)
+                        )
+                    )
+                elif operator == 'between':
+                    conditions.append(
+                        models.FieldCondition(
+                            key="price",
+                            range=models.Range(
+                                gte=value[0],
+                                lte=value[1]
+                            )
+                        )
+                    )
+            
+            # รวม conditions สำหรับ product ที่มีราคา
+            filter_conditions = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="doctype",
+                        match=models.MatchValue(value="JJ Product")
+                    ),
+                    *conditions
+                ]
+            )
+            
+            frappe.log_error(
+                title="Price Filter Debug",
+                message=f"""
+                Price Conditions: {price_conditions}
+                Filter Applied: {filter_conditions}
+                """
+            )
+        
+        # ค้นหาด้วย vector และ filter (ถ้ามี)
+        search_results = agent.qdrant.client.search(
+            collection_name="jj_data",
             query_vector=vector,
-            limit=5,
-            score_threshold=0.5
-        )
-        
-        content_results = agent.qdrant.client.search(
-            collection_name="jj_content",
-            query_vector=vector,
-            limit=3,
+            limit=8,
             score_threshold=0.3,
             search_params=models.SearchParams(
-                hnsw_ef=128
-            )
+                hnsw_ef=256
+            ),
+            query_filter=filter_conditions
+        )
+        
+        # แยกประเภทตาม doctype
+        product_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Product']
+        content_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Content']
+        
+        frappe.log_error(
+            title="Search Results Debug",
+            message=f"""
+            Query: {questions_text}
+            Has Price Filter: {bool(filter_conditions)}
+            Total Results: {len(search_results)}
+            Product Results: {len(product_results)}
+            Content Results: {len(content_results)}
+            First Result Score: {search_results[0].score if search_results else 'No results'}
+            """
         )
         
         # เก็บ products ก่อนสร้าง context
@@ -270,8 +345,6 @@ def reply_message(message: str, session_id: str) -> Dict:
             })
         # สร้าง context จากผลการค้นหาทั้งหมด
         context = "ข้อมูลที่เกี่ยวข้อง:\n"
-        frappe.log_error(title="product_results", message=f"product_results: {product_results}  questions: {questions_text}")
-        frappe.log_error(title="content_results", message=f"content_results: {content_results} questions: {questions_text}")
         # เรียงผลการค้นหาตาม score
         all_results = (
             [(r, 'product') for r in product_results] +
@@ -356,17 +429,6 @@ Note: Keep it within 2 lines, no markdown formatting"""
             "timestamp": str(frappe.utils.now_datetime())
         })
         chat_history.insert(ignore_permissions=True)
-
-        # เพิ่ม logging เพื่อ debug
-        frappe.log_error(
-            title="Search Results Debug",
-            message=f"""
-            Query: {questions_text}
-            Product Results: {len(product_results)}
-            Content Results: {len(content_results)}
-            First Content Score: {content_results[0].score if content_results else 'No results'}
-            """
-        )
 
         return {
             "text": final_response["content"],

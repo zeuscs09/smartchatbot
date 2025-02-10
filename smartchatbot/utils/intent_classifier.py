@@ -26,71 +26,104 @@ class IntentClassifier:
         }
     
     def extract_questions(self, text: str, session_id: str = None) -> Dict:
-        """วิเคราะห์ intent และส่งคืนทั้ง questions และ token usage"""
-        # แปลง unicode เป็นข้อความปกติก่อนวิเคราะห์
         decoded_text = text.encode().decode('unicode-escape') if '\\u' in text else text
         
-        instruction = """You are an expert in question analysis. Please analyze and transform the following question or message.
+        # ดึงข้อมูลจากระบบ
+        data = self.get_instruction_data()
+        content_types = data.get("content_types", [])
+        product_categories = data.get("product_categories", [])
+        
+        instruction = f"""You are an expert in question analysis. For the given message, analyze and extract price conditions if present.
 
-Message types are:
-1. product: Questions about products
-2. content: Questions about content and articles
-3. greeting: Greetings, hello, or general messages
-4. general: General questions that are not specific
+For price-related questions, you MUST extract specific price conditions in this format:
+- operator: Use these symbols only
+  * "=" for exact price
+  * "<" for less than
+  * ">" for more than
+  * "<=" for less than or equal
+  * ">=" for more than or equal
+  * "between" for price range
+- value: number or [min, max] for "between" operator
 
-For product and content types, transform the question into a search-friendly format by:
-1. Remove unnecessary words like "มีไหม", "อยากทราบ", etc.
-2. Keep only essential keywords
-3. Add relevant category terms if implied
-4. Standardize units (ml, kg, etc.)
+For search_text extraction:
+1. REMOVE these words:
+   - Price related: "ราคา", "บาท", "ไม่เกิน", "ต่ำกว่า", "สูงกว่า", "ระหว่าง", "ถึง"
+   - Generic terms: "สินค้า", "ของ", "อยากได้", "มี", "หา", "ขอ", "ดู", "เกี่ยวกับ"
+   - Price numbers and units
 
-Please respond in JSON object format with a "questions" key as an array where each object contains:
-- original_question: The original message
-- search_text: The transformed search-friendly text (for product/content types only)
-- type: Message type (product, content, greeting, general)
-- intents: Array of related intents e.g. ["ask_image", "ask_price"]
-- industry: Array of related industries (if any)"""
+2. KEEP these words:
+   - Product categories: {", ".join(product_categories)}
+   - Content types: {", ".join(content_types)}
+   - Specific product attributes and descriptions
+   - Industry or usage context
+   - Brand names if mentioned
 
-        # สร้าง context จากประวัติการสนทนา
-        context = ""
-        if session_id:
-            history = self.ai_client.get_conversation_history(session_id)
-            if history:
-                context = "Previous conversation history:\n"
-                for msg in history:  # ดึงแค่ 3 messages ล่าสุด
-                    role = "User" if msg["role"] == "user" else "Assistant"
-                    context += f"{role}: {msg['content']}\n"
-                context += "\nCurrent message:\n"
+Examples of price extraction:
+- "ราคาต่ำกว่า 10 บาท" -> {{"operator": "<", "value": 10}}
+- "สินค้าราคาไม่เกิน 100" -> {{"operator": "<=", "value": 100}}
+- "ราคา 200-300 บาท" -> {{"operator": "between", "value": [200, 300]}}
 
-        response = self.ai_client.chat_completion(
-            messages=[
-                {"role": "system", "content": instruction},
-                {"role": "user", "content": f"{context}{decoded_text}"}
-            ],
-            temperature=0,
-            response_format={ "type": "json_object" }
-        )
+Examples of search_text:
+- "สบู่เหลวราคาไม่เกิน 10 บาท" -> search_text: "สบู่เหลว"
+- "หาสบู่โรงแรมราคา 4-8 บาท" -> search_text: "สบู่ โรงแรม"
+- "สินค้าราคา 4-8 บาท" -> search_text: ""
+
+Please respond in JSON format with:
+{{
+    "questions": [
+        {{
+            "original_question": "Original text",
+            "search_text": "Clean search text without price and generic terms",
+            "type": "product/content/greeting/general",
+            "intents": ["intent1", "intent2"],
+            "price_condition": {{price condition object if any}},
+            "industry": ["industry1", "industry2"]
+        }}
+    ]
+}}
+
+Note: Always check for price conditions in Thai language patterns like:
+- "ราคา..." "ราคาไม่เกิน..." "ราคาต่ำกว่า..."
+- "...บาท" "...บาทขึ้นไป" "...บาทลงมา"
+- "ไม่เกิน..." "ต่ำกว่า..." "สูงกว่า..."
+- "ระหว่าง... ถึง..."
+
+If no specific product, content, or attribute is mentioned, search_text should be empty string."""
 
         try:
+            response = self.ai_client.chat_completion(
+                messages=[
+                    {"role": "system", "content": instruction},
+                    {"role": "user", "content": decoded_text}
+                ]
+            )
+            
+            # เพิ่ม logging เพื่อ debug
+            frappe.log_error(
+                title="Intent Analysis Debug",
+                message=f"""
+                Input: {decoded_text}
+                Available Categories: {product_categories}
+                Available Content Types: {content_types}
+                Response: {response.get('content')}
+                """
+            )
+            
             result = frappe.parse_json(response["content"])
             return {
-                "questions": result.get("questions", [{
-                    "original_question": decoded_text,
-                    "search_text": decoded_text,  # ถ้าไม่มีการแปลง ใช้ข้อความเดิม
-                    "type": "general",
-                    "intents": [],
-                    "industry": []
-                }]),
+                "questions": result.get("questions", []),
                 "usage": response.get("usage", {})
             }
+            
         except Exception as e:
-            frappe.log_error(f"Error parsing intent: {str(e)}\nResponse: {response}")
+            frappe.log_error(f"Error in intent analysis: {str(e)}\nResponse: {response}")
             return {
                 "questions": [{
                     "original_question": decoded_text,
                     "search_text": decoded_text,
                     "type": "general",
                     "intents": [],
+                    "price_condition": None,
                     "industry": []
                 }],
                 "usage": response.get("usage", {})
