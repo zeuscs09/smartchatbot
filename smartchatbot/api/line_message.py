@@ -11,7 +11,9 @@ from linebot.v3.messaging import (
     ApiClient,
     MessagingApi,
     ReplyMessageRequest,
-    TextMessage
+    TextMessage,
+    FlexMessage,
+    FlexContainer
 )
 from linebot.v3.webhooks import (
     MessageEvent,
@@ -33,29 +35,93 @@ def create_message_handler(doc, handler, configuration):
             
             # ใช้ ChatGPT ตอบกลับ
             user_message = event.message.text
-            reply_text = reply_message(user_message)
+            response = reply_message(user_message, doc.user_id)
+            
+            messages = []
+            if isinstance(response, dict) and 'products' in response:
+                # สร้าง Flex Message สำหรับแสดงสินค้า
+                flex_contents = {
+                    "type": "carousel",
+                    "contents": []
+                }
+                
+                for product in response['products']:
+                    bubble = {
+                        "type": "bubble",
+                        "hero": {
+                            "type": "image",
+                            "url": product['image_url'],
+                            "size": "full",
+                            "aspectRatio": "20:13",
+                            "aspectMode": "cover"
+                        },
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": product['title'],
+                                    "weight": "bold",
+                                    "size": "md",
+                                    "wrap": True
+                                },
+                                {
+                                    "type": "text",
+                                    "text": f"ราคา: {product['price']} บาท",
+                                    "size": "sm",
+                                    "color": "#555555"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": product['description'],
+                                    "size": "xs",
+                                    "color": "#555555",
+                                    "wrap": True,
+                                    "maxLines": 5
+                                }
+                            ]
+                        }
+                    }
+                    flex_contents["contents"].append(bubble)
+                
+                messages.append(
+                    FlexMessage(
+                        alt_text="รายการสินค้า",
+                        contents=FlexContainer.from_dict(flex_contents)
+                    )
+                )
+                
+                # เพิ่มข้อความอธิบายถ้ามี
+                if 'text' in response:
+                    messages.append(TextMessage(text=response['text']))
+                    
+                reply_text = response.get('text', 'ดูรายการสินค้าด้านบนค่ะ')
+            else:
+                messages.append(TextMessage(text=response))
+                reply_text = response
             
             # ส่งข้อความตอบกลับ
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 
                 frappe.log_error(title="LINE Debug", 
-                               message=f"Attempting to reply with text: {reply_text}")
+                               message=f"Attempting to reply with messages: {messages}")
                 
                 response = line_bot_api.reply_message(
                     ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[TextMessage(text=reply_text)]
+                        messages=messages
                     )
                 )
-                
-                # บันทึกข้อความตอบกลับพร้อมเวลา
-                doc.response_text = reply_text
-                doc.response_time = frappe.utils.now_datetime()
-                doc.save(ignore_permissions=True)
-                
-                frappe.log_error(title="LINE Debug", message="Message handled successfully")
-                
+            
+            # บันทึกข้อความตอบกลับพร้อมเวลา
+            doc.response_text = reply_text
+            doc.response_time = frappe.utils.now_datetime()
+            doc.save(ignore_permissions=True)
+            
+            frappe.log_error(title="LINE Debug", message="Message handled successfully")
+            
         except Exception as e:
             frappe.log_error(title="LINE Message Handler Error", 
                            message=f"Error in handle_message: {str(e)}\nEvent: {event}")

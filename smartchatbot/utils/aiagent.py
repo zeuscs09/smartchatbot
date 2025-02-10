@@ -5,12 +5,49 @@ from .ai_client import AIClient
 from .qdrant import QdrantManager
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+import uuid
+from datetime import datetime, timedelta
 
 class AIAgent:
     def __init__(self):
         self.ai_client = AIClient.get_instance()
         self.classifier = IntentClassifier()
         self.qdrant = QdrantManager()
+   
+
+    def get_or_create_session(self, session_id: str = None) -> str:
+        """สร้างหรือดึง session ที่มีอยู่"""
+        # ถ้ามี session_id ให้ตรวจสอบว่ายังใช้งานได้
+        if session_id:
+            active_session = frappe.get_all(
+                "JJ Chat History",
+                filters={
+                    "session_id": session_id
+                  
+                },
+                limit=1
+            )
+            if active_session:
+                return session_id
+        
+        # หา session ล่าสุดที่ยังไม่หมดอายุ
+        active_session = frappe.get_all(
+            "JJ Chat History",
+            filters={
+                "session_id": session_id
+            },
+            fields=["session_id"],
+            order_by="creation desc",
+            limit=1
+        )
+        
+        if active_session:
+            return active_session[0].session_id
+            
+        # สร้าง session ใหม่
+        return f"session_{uuid.uuid4().hex[:12]}"
+
+
 
     def answer_product(self, questions: List[Dict]) -> str:
         """ตอบคำถามเกี่ยวกับสินค้า"""
@@ -124,45 +161,57 @@ class AIAgent:
             max_tokens=1000
         )
 
-def reply_message(message: str) -> str:
-    chat_history = None
+def reply_message(message: str, session_id: str) -> Dict:
+    """
+    ตอบกลับข้อความโดยใช้ session_id ที่ได้รับจากภายนอก
+    Returns:
+        Dict: {
+            "text": str,  # ข้อความตอบกลับ
+            "products": List[Dict]  # array ของสินค้าที่เกี่ยวข้อง
+        }
+    """
     try:
         agent = AIAgent()
         
-        # สร้างบันทึกประวัติการสนทนา
+        # วิเคราะห์ intent พร้อม session context
+        intent_response = agent.classifier.extract_questions(
+            message, 
+            session_id=session_id
+        )
+        
+        questions = intent_response["questions"]
+        questions_text = "\n".join([q['question'] for q in questions])
+        
+        # สร้าง chat history
         chat_history = frappe.get_doc({
             "doctype": "JJ Chat History",
             "user_message": message,
-            "timestamp": frappe.utils.now_datetime(),
-            "intent_analysis": "{}",
-            "search_results": "{}",
-            "ai_response": ""
+            "session_id": session_id,
+            "intent_analysis": frappe.as_json({
+                "questions": questions,
+                "success": True,
+                "timestamp": str(frappe.utils.now_datetime())
+            }, indent=2),
+            "intent_token": intent_response.get("usage", {}).get("total_tokens", 0)
         })
         
-        # วิเคราะห์ intent
-        questions = agent.classifier.extract_questions(message)
-        if not questions:
-            intent_analysis = {
-                "success": False,
-                "error": "ไม่สามารถวิเคราะห์คำถามได้",
-                "questions": []
-            }
-            chat_history.intent_analysis = frappe.as_json(intent_analysis, indent=2, ensure_ascii=False)
-            chat_history.ai_response = "ขออภัย ฉันไม่เข้าใจคำถามของคุณ กรุณาถามใหม่อีกครั้ง"
+        # ถ้าเป็น greeting หรือ general
+        if questions and questions[0]['type'] in ['greeting', 'general']:
+            ai_response = agent.ai_client.chat_completion(
+                messages=[{"role": "user", "content": message}],
+                session_id=session_id
+            )
+            
+            chat_history.ai_response = ai_response["content"]
+            chat_history.response_token = ai_response.get("usage", {}).get("total_tokens", 0)
             chat_history.insert(ignore_permissions=True)
-            return chat_history.ai_response
-        
-        # บันทึกผลการวิเคราะห์ intent
-        intent_analysis = {
-            "success": True,
-            "questions": questions,
-            "timestamp": str(frappe.utils.now_datetime())
-        }
-        chat_history.intent_analysis = frappe.as_json(intent_analysis, indent=2, ensure_ascii=False)
-        
-        # รวมคำถามทั้งหมด
-        questions_text = " ".join(q['question'] for q in questions)
-        vector = agent.qdrant.get_embedding(questions_text)
+            return {
+                "text": ai_response["content"],
+                "products": []
+            }
+            
+        # ถ้าไม่ใช่ greeting ค่อยทำการค้นหาข้อมูล
+        vector = agent.ai_client.get_embedding(questions_text)
         
         # ค้นหาจากทั้ง content และ product
         search_results = {
@@ -189,107 +238,18 @@ def reply_message(message: str) -> str:
             score_threshold=0.5
         )
         
-        # ถ้าไม่พบผลการค้นหา ลองหาวิธีอื่นๆ
-        if not product_results and not content_results:
-            alternative_results = []
-            
-            # 1. ลองค้นหาจาก industry ถ้ามี
-            industries = []
-            for q in questions:
-                if q.get('industry'):  # ใช้ .get() เพื่อป้องกัน KeyError
-                    industries.extend(q['industry'])
-            
-            if industries:
-                industry_filter = models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="industries",
-                            match={
-                                "any": industries
-                            }
-                        )
-                    ]
-                )
-                
-                industry_results = agent.qdrant.client.search(
-                    collection_name="jj_product",
-                    query_vector=vector,
-                    limit=3,
-                    query_filter=industry_filter
-                )
-                alternative_results.extend(industry_results)
-            
-            # 2. ถ้ายังไม่พบ ลองค้นหาสินค้าทั่วไปที่เกี่ยวข้อง
-            if not alternative_results:
-                general_results = agent.qdrant.client.search(
-                    collection_name="jj_product",
-                    query_vector=vector,
-                    limit=3,
-                    score_threshold=0.3  # ลด threshold ลงเพื่อหาสินค้าที่เกี่ยวข้องมากขึ้น
-                )
-                alternative_results.extend(general_results)
-            
-            # ถ้าพบผลลัพธ์ทางเลือก
-            if alternative_results:
-                search_results["combined_search"]["product_results"] = [
-                    {
-                        "id": r.id,
-                        "score": r.score,
-                        "title": r.payload.get('title', ''),
-                        "description": r.payload.get('description', ''),
-                        "price": r.payload.get('price', ''),
-                        "image_url": r.payload.get('image_url', ''),
-                        "type": "product",
-                        "industries": r.payload.get('industries', [])
-                    } for r in alternative_results
-                ]
-                
-                # สร้าง context สำหรับสินค้าที่แนะนำ
-                context = "ขออภัย ไม่พบสินค้าที่ตรงกับคำถามของคุณ\n\nแต่เรามีสินค้าที่อาจเกี่ยวข้องดังนี้:\n"
-                for result in alternative_results:
-                    payload = result.payload
-                    context += f"\nชื่อ: {payload.get('title', '')}\n"
-                    context += f"รายละเอียด: {payload.get('description', '')}\n"
-                    if payload.get('price'):
-                        context += f"ราคา: {payload['price']}\n"
-                    if payload.get('image_url') and any('ask_image' in q.get('intents', []) for q in questions):
-                        context += f"รูปภาพ: {payload['image_url']}\n"
-                
-                # บันทึกผลการค้นหา
-                chat_history.search_results = frappe.as_json(search_results, indent=2, ensure_ascii=False)
-                
-                # สร้างคำตอบ
-                instruction = """คุณเป็นผู้เชี่ยวชาญด้านการแนะนำสินค้า กรุณา:
-                1. ถ้าพบสินค้าที่เกี่ยวข้อง ให้แนะนำสินค้าโดยตรง ไม่ต้องบอกว่า "ไม่พบสินค้า"
-                2. อธิบายคุณสมบัติเด่นของสินค้าที่แนะนำ
-                3. เน้นประโยชน์และความเหมาะสมกับการใช้งาน
-                4. ถ้าผู้ใช้ถามหาสินค้านอกเหนือจากสินค้าใด ให้เน้นนำเสนอสินค้าประเภทอื่นๆ ที่พบ"""
-                
-                final_answer = agent.ai_client.chat_completion(
-                    messages=[
-                        {"role": "system", "content": instruction},
-                        {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}"}
-                    ],
-                    max_tokens=1000
-                )
-                
-                chat_history.ai_response = final_answer
-                chat_history.insert(ignore_permissions=True)
-                return final_answer
-            
-            # ถ้าไม่พบผลลัพธ์ใดๆ เลย
-            chat_history.search_results = frappe.as_json({
-                "combined_search": {
-                    "query": questions_text,
-                    "error": "ไม่พบข้อมูลที่เกี่ยวข้อง",
-                    "timestamp": str(frappe.utils.now_datetime())
-                }
-            }, indent=2, ensure_ascii=False)
-            
-            chat_history.ai_response = "ขออภัย ขณะนี้เราไม่มีสินค้าหรือข้อมูลที่ตรงกับความต้องการของคุณ กรุณาติดต่อเจ้าหน้าที่เพื่อสอบถามข้อมูลเพิ่มเติม"
-            chat_history.insert(ignore_permissions=True)
-            return chat_history.ai_response
-            
+        # เก็บ products ก่อนสร้าง context
+        products = []
+        for result in product_results:
+            payload = result.payload
+            products.append({
+                "name": payload.get("id", ""),
+                "title": payload.get("title", ""),
+                "price": payload.get("price", ""),
+                "description": payload.get("description", ""),
+                "image_url": payload.get("image_url", "")
+            })
+        
         # สร้าง context จากผลการค้นหาทั้งหมด
         context = "ข้อมูลที่เกี่ยวข้อง:\n"
         
@@ -315,47 +275,38 @@ def reply_message(message: str) -> str:
             if has_image_intent and payload.get('image_url'):
                 context += f"รูปภาพ: {payload['image_url']}\n"
         
-        # สร้างคำตอบ
-        instruction = """คุณเป็นผู้เชี่ยวชาญ กรุณาตอบคำถามต่อไปนี้โดยใช้ข้อมูลที่ให้มา
-        - ถ้าเป็นคำถามเกี่ยวกับสินค้า ให้เน้นตอบข้อมูลจากส่วนที่เป็น product
-        - ถ้าเป็นคำถามเกี่ยวกับเนื้อหาหรือบทความ ให้เน้นตอบข้อมูลจากส่วนที่เป็น content
-        - ถ้ามีการถามถึงรูปภาพ ให้แสดงลิงก์รูปภาพด้วย"""
-        
-        questions_text = "\n".join(f"- {q['question']}" for q in questions)
-        
-        final_answer = agent.ai_client.chat_completion(
+        if products:
+            summary_text="ตอบแบบสรุปสินค้า";
+        else:
+            summary_text="";
+        # สร้างคำตอบพร้อม session context
+        final_response = agent.ai_client.chat_completion(
             messages=[
-                {"role": "system", "content": instruction},
-                {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}"}
+                {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}\n\n{summary_text}"}
             ],
-            max_tokens=1000
+            session_id=session_id
         )
         
-        # บันทึกคำตอบ
-        chat_history.ai_response = final_answer
+        chat_history.ai_response = final_response["content"]
+        chat_history.response_token = final_response.get("usage", {}).get("total_tokens", 0)
+        chat_history.search_results = frappe.as_json({
+            "products": products,
+            "content": content_results,
+            "timestamp": str(frappe.utils.now_datetime())
+        })
         chat_history.insert(ignore_permissions=True)
-        
-        return final_answer
+
+        return {
+            "text": final_response["content"],
+            "products": products
+        }
         
     except Exception as e:
-        error_message = f"Error: {str(e)}"
-        frappe.log_error(message=error_message, title="ChatGPT Error")
-        
-        if chat_history:
-            error_data = {
-                "success": False,
-                "error": error_message,
-                "questions": []
-            }
-            chat_history.intent_analysis = frappe.as_json(error_data, indent=2, ensure_ascii=False)
-            chat_history.search_results = frappe.as_json({
-                "error": error_message,
-                "timestamp": str(frappe.utils.now_datetime())
-            }, indent=2, ensure_ascii=False)
-            chat_history.ai_response = "ขออภัย ระบบมีปัญหา กรุณาลองใหม่อีกครั้ง"
-            chat_history.insert(ignore_permissions=True)
-        
-        return "ขออภัย ระบบมีปัญหา กรุณาลองใหม่อีกครั้ง"
+        frappe.log_error(f"Error in reply_message: {str(e)}")
+        return {
+            "text": "ขออภัย เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง",
+            "products": []
+        }
     
 
     

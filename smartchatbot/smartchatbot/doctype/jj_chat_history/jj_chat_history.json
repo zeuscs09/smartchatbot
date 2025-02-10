@@ -7,12 +7,15 @@
  "field_order": [
   "user_message",
   "timestamp",
+  "session_id",
   "section_break_jsaz",
   "intent_analysis",
+  "intent_token",
   "section_break_zaon",
   "search_results",
   "section_break_babl",
-  "ai_response"
+  "ai_response",
+  "response_token"
  ],
  "fields": [
   {
@@ -53,11 +56,29 @@
    "fieldtype": "Text",
    "in_list_view": 1,
    "label": "AI Response"
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Session Id",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "intent_token",
+   "fieldtype": "Float",
+   "label": "Intent Token"
+  },
+  {
+   "fieldname": "response_token",
+   "fieldtype": "Float",
+   "label": "Response Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-10 14:47:36.036758",
+ "modified": "2025-02-10 15:59:05.106722",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chat History",
