@@ -27,35 +27,45 @@ class IntentClassifier:
     
     def extract_questions(self, text: str, session_id: str = None) -> Dict:
         """วิเคราะห์ intent และส่งคืนทั้ง questions และ token usage"""
-        instruction = """คุณเป็นผู้เชี่ยวชาญในการวิเคราะห์คำถาม กรุณาแยกประเภทคำถามหรือข้อความ
+        # แปลง unicode เป็นข้อความปกติก่อนวิเคราะห์
+        decoded_text = text.encode().decode('unicode-escape') if '\\u' in text else text
+        
+        instruction = """You are an expert in question analysis. Please analyze and transform the following question or message.
 
-ประเภทข้อความมีดังนี้:
-1. product: คำถามเกี่ยวกับสินค้า
-2. content: คำถามเกี่ยวกับเนื้อหาและบทความ
-3. greeting: คำทักทาย สวัสดี หรือข้อความทั่วไป
-4. general: คำถามทั่วไปที่ไม่เฉพาะเจาะจง
+Message types are:
+1. product: Questions about products
+2. content: Questions about content and articles
+3. greeting: Greetings, hello, or general messages
+4. general: General questions that are not specific
 
-กรุณาตอบในรูปแบบ JSON object ที่มี key "questions" เป็น array โดยแต่ละ object ประกอบด้วย:
-- question: ข้อความหรือคำถาม
-- type: ประเภทของข้อความ (product, content, greeting, general)
-- intents: array ของ intent ที่เกี่ยวข้อง เช่น ["ask_image", "ask_price"]
-- industry: array ของอุตสาหกรรมที่เกี่ยวข้อง (ถ้ามี)"""
+For product and content types, transform the question into a search-friendly format by:
+1. Remove unnecessary words like "มีไหม", "อยากทราบ", etc.
+2. Keep only essential keywords
+3. Add relevant category terms if implied
+4. Standardize units (ml, kg, etc.)
+
+Please respond in JSON object format with a "questions" key as an array where each object contains:
+- original_question: The original message
+- search_text: The transformed search-friendly text (for product/content types only)
+- type: Message type (product, content, greeting, general)
+- intents: Array of related intents e.g. ["ask_image", "ask_price"]
+- industry: Array of related industries (if any)"""
 
         # สร้าง context จากประวัติการสนทนา
         context = ""
         if session_id:
             history = self.ai_client.get_conversation_history(session_id)
             if history:
-                context = "ประวัติการสนทนาก่อนหน้า:\n"
-                for msg in history[-3:]:  # ดึงแค่ 3 messages ล่าสุด
-                    role = "ผู้ใช้" if msg["role"] == "user" else "ผู้ช่วย"
+                context = "Previous conversation history:\n"
+                for msg in history:  # ดึงแค่ 3 messages ล่าสุด
+                    role = "User" if msg["role"] == "user" else "Assistant"
                     context += f"{role}: {msg['content']}\n"
-                context += "\nข้อความปัจจุบัน:\n"
+                context += "\nCurrent message:\n"
 
         response = self.ai_client.chat_completion(
             messages=[
                 {"role": "system", "content": instruction},
-                {"role": "user", "content": f"{context}{text}"}
+                {"role": "user", "content": f"{context}{decoded_text}"}
             ],
             temperature=0,
             response_format={ "type": "json_object" }
@@ -65,7 +75,8 @@ class IntentClassifier:
             result = frappe.parse_json(response["content"])
             return {
                 "questions": result.get("questions", [{
-                    "question": text,
+                    "original_question": decoded_text,
+                    "search_text": decoded_text,  # ถ้าไม่มีการแปลง ใช้ข้อความเดิม
                     "type": "general",
                     "intents": [],
                     "industry": []
@@ -74,10 +85,10 @@ class IntentClassifier:
             }
         except Exception as e:
             frappe.log_error(f"Error parsing intent: {str(e)}\nResponse: {response}")
-            # ส่งค่า default ในรูปแบบเดียวกัน
             return {
                 "questions": [{
-                    "question": text,
+                    "original_question": decoded_text,
+                    "search_text": decoded_text,
                     "type": "general",
                     "intents": [],
                     "industry": []

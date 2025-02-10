@@ -8,6 +8,8 @@
   "user_message",
   "timestamp",
   "session_id",
+  "section_break_cucl",
+  "chat_history",
   "section_break_jsaz",
   "intent_analysis",
   "intent_token",
@@ -74,11 +76,20 @@
    "fieldname": "response_token",
    "fieldtype": "Float",
    "label": "Response Token"
+  },
+  {
+   "fieldname": "section_break_cucl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "chat_history",
+   "fieldtype": "JSON",
+   "label": "Chat History"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-02-10 15:59:05.106722",
+ "modified": "2025-02-11 04:59:39.761815",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chat History",

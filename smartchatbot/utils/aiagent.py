@@ -181,8 +181,11 @@ def reply_message(message: str, session_id: str) -> Dict:
         )
         
         questions = intent_response["questions"]
-        questions_text = "\n".join([q['question'] for q in questions])
         
+        # ใช้ search_text แทน original_question
+        search_texts = [q['search_text'] for q in questions if q['type'] in ['product', 'content']]
+        questions_text = " ".join(search_texts) if search_texts else message
+
         # สร้าง chat history
         chat_history = frappe.get_doc({
             "doctype": "JJ Chat History",
@@ -209,21 +212,22 @@ def reply_message(message: str, session_id: str) -> Dict:
             return {
                 "text": ai_response["content"],
                 "summary_text": "",
-                "products": []
+                "products": [],
+                "content": []
             }
             
         # ถ้าไม่ใช่ greeting ค่อยทำการค้นหาข้อมูล
         vector = agent.ai_client.get_embedding(questions_text)
         
-        # ค้นหาจากทั้ง content และ product
-        search_results = {
-            "combined_search": {
-                "query": questions_text,
-                "product_results": [],
-                "content_results": [],
-                "timestamp": str(frappe.utils.now_datetime())
-            }
-        }
+        # # ค้นหาจากทั้ง content และ product
+        # search_results = {
+        #     "combined_search": {
+        #         "query": questions_text,
+        #         "product_results": [],
+        #         "content_results": [],
+        #         "timestamp": str(frappe.utils.now_datetime())
+        #     }
+        # }
         
         # ค้นหาจาก product และ content collection
         product_results = agent.qdrant.client.search(
@@ -237,7 +241,10 @@ def reply_message(message: str, session_id: str) -> Dict:
             collection_name="jj_content",
             query_vector=vector,
             limit=3,
-            score_threshold=0.5
+            score_threshold=0.3,
+            search_params=models.SearchParams(
+                hnsw_ef=128
+            )
         )
         
         # เก็บ products ก่อนสร้าง context
@@ -252,13 +259,23 @@ def reply_message(message: str, session_id: str) -> Dict:
                 "image_url": payload.get("image_url", "")
             })
         
+        contents=[]
+        for result in content_results:
+            payload = result.payload
+            contents.append({
+                "name": payload.get("id", ""),
+                "title": payload.get("title", ""),
+                "description": payload.get("description", ""),
+                "image_url": payload.get("image_url", "")
+            })
         # สร้าง context จากผลการค้นหาทั้งหมด
         context = "ข้อมูลที่เกี่ยวข้อง:\n"
-        
+        frappe.log_error(title="product_results", message=f"product_results: {product_results}  questions: {questions_text}")
+        frappe.log_error(title="content_results", message=f"content_results: {content_results} questions: {questions_text}")
         # เรียงผลการค้นหาตาม score
         all_results = (
             [(r, 'product') for r in product_results] +
-            [(r, 'type') for r in content_results]
+            [(r, 'content') for r in content_results]
         )
         all_results.sort(key=lambda x: x[0].score, reverse=True)
         
@@ -277,32 +294,35 @@ def reply_message(message: str, session_id: str) -> Dict:
             if has_image_intent and payload.get('image_url'):
                 context += f"รูปภาพ: {payload['image_url']}\n"
         
-        if products:
-            instruction = """You are a product expert. Please answer questions following these guidelines:
+        temperature=0.2
+        if all_results:  # เปลี่ยนจาก products เป็น all_results
+            instruction = """You are a knowledgeable assistant. Please answer questions following these guidelines:
 1. Be concise and to the point
 2. For price-related questions, specify exact prices
-3. For multiple products, list them with bullet points
+3. For multiple items, list them with bullet points
 4. Use friendly and polite Thai language
-5. Include image links when asked about product images
+5. Include image links when asked about images
 6. For products under 100 baht, emphasize value for money
 7. For products with multiple sizes, recommend based on usage
-8. Do not use any markdown formatting
-9. Response must be in Thai language"""
+8. For content/articles, highlight key information
+9. Do not use any markdown formatting
+10. Response must be in Thai language"""
 
-            summary_instruction = """Summarize the product information in Thai language:
-1. Number of relevant products
-2. Price range (if any)
-3. Key product features
+            summary_instruction = """Summarize the information in Thai language:
+1. Number of relevant items (both products and content)
+2. Price range (if products)
+3. Key features or information points
 Note: Keep it within 2 lines, no markdown formatting"""
 
         else:
-            instruction = """You are an information expert. Please follow these guidelines:
-1. Be concise and to the point
-2. Use friendly and polite Thai language
-3. If no exact match found, suggest alternative questions
-4. Provide additional useful recommendations
-5. Do not use any markdown formatting
-6. Response must be in Thai language"""
+            instruction = """You are a helpful customer service agent. The user asked about our products/services, 
+            but we couldn't find exact matching information. Please:
+            1. Politely inform that we don't have the exact information
+            2. Suggest how they might rephrase their question
+            3. Offer to help find alternative products/information
+            4. Keep the tone friendly and professional
+            5. Use Thai language
+            6. Do not make up any product information"""
 
             summary_instruction = """Summarize the answer in Thai language:
 1. Keep it within 1 line
@@ -315,7 +335,8 @@ Note: Keep it within 2 lines, no markdown formatting"""
                 {"role": "system", "content": instruction },
                 {"role": "user", "content": f"{context}\n\nคำถาม:\n{questions_text}"}
             ],
-            session_id=session_id
+            session_id=session_id,
+            temperature=temperature
         )
 
         # สร้างคำตอบแบบสรุป
@@ -328,18 +349,30 @@ Note: Keep it within 2 lines, no markdown formatting"""
         )
         
         chat_history.ai_response = final_response["content"]
-        chat_history.response_token = final_response.get("usage", {}).get("total_tokens", 0)
+        chat_history.response_token = final_response.get("usage", {}).get("total_tokens", 0) + summary_response.get("usage", {}).get("total_tokens", 0)
         chat_history.search_results = frappe.as_json({
             "products": products,
-            "content": content_results,
+            "content": contents,
             "timestamp": str(frappe.utils.now_datetime())
         })
         chat_history.insert(ignore_permissions=True)
 
+        # เพิ่ม logging เพื่อ debug
+        frappe.log_error(
+            title="Search Results Debug",
+            message=f"""
+            Query: {questions_text}
+            Product Results: {len(product_results)}
+            Content Results: {len(content_results)}
+            First Content Score: {content_results[0].score if content_results else 'No results'}
+            """
+        )
+
         return {
             "text": final_response["content"],
             "summary_text": summary_response["content"],
-            "products": products
+            "products": products,
+            "content": contents
         }
         
     except Exception as e:
@@ -347,7 +380,8 @@ Note: Keep it within 2 lines, no markdown formatting"""
         return {
             "text": "ขออภัย เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง",
             "summary_text": "เกิดข้อผิดพลาด",
-            "products": []
+            "products": [],
+            "content": []
         }
     
 
