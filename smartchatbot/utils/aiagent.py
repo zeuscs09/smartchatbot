@@ -298,10 +298,10 @@ def reply_message(message: str, session_id: str) -> Dict:
         search_results = agent.qdrant.client.search(
             collection_name="jj_data",
             query_vector=vector,
-            limit=8,
-            score_threshold=0.3,
+            limit=20,
+            score_threshold=0.2,
             search_params=models.SearchParams(
-                hnsw_ef=256
+                hnsw_ef=512
             ),
             query_filter=filter_conditions
         )
