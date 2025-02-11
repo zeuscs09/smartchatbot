@@ -438,7 +438,7 @@ Note: Keep it within 2 lines, no markdown formatting"""
         }
         
     except Exception as e:
-        frappe.log_error(f"Error in reply_message: {str(e)}")
+        frappe.log_error(title="Error in reply_message", message=f"Error in reply_message: {str(e)}")
         return {
             "text": "ขออภัย เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง",
             "summary_text": "เกิดข้อผิดพลาด",

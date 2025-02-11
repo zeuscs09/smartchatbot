@@ -116,7 +116,7 @@ If no specific product, content, or attribute is mentioned, search_text should b
             }
             
         except Exception as e:
-            frappe.log_error(f"Error in intent analysis: {str(e)}\nResponse: {response}")
+            frappe.log_error(title="Error in intent analysis", message=f"Error in intent analysis: {str(e)}\nResponse: {response}")
             return {
                 "questions": [{
                     "original_question": decoded_text,

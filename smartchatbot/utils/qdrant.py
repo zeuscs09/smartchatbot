@@ -125,7 +125,7 @@ class QdrantManager:
                     doc.save(ignore_permissions=True)
                     
                 except Exception as e:
-                    frappe.log_error(f"Error syncing content {content.name}: {str(e)}")
+                    frappe.log_error(title="Error syncing content", message=f"Error syncing content {content.name}: {str(e)}")
 
             # เตรียมข้อมูล Product
             for product in products_to_sync:
@@ -157,7 +157,7 @@ class QdrantManager:
                     doc.save(ignore_permissions=True)
                     
                 except Exception as e:
-                    frappe.log_error(f"Error syncing product {product.name}: {str(e)}")
+                    frappe.log_error(title="Error syncing product", message=f"Error syncing product {product.name}: {str(e)}")
 
             # อัพเดทข้อมูลทั้งหมดใน collection เดียว
             if points:
@@ -172,6 +172,6 @@ class QdrantManager:
             }
             
         except Exception as e:
-            frappe.log_error(str(e), "Qdrant Sync Error")
+            frappe.log_error(title="Qdrant Sync Error", message=str(e))
             raise e
 
