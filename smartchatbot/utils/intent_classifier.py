@@ -37,10 +37,18 @@ class IntentClassifier:
 
 Message types and intents:
 1. type: "product" - Questions about products
+   - Questions about products, prices, or inventory
+   - Questions like "มีอะไรบ้าง", "มีสินค้าอะไร"
+   - Questions about specific products
    - intent: ["product"] only
+
 2. type: "content" - Questions about content/articles
+   - Questions about articles or information
+   - Questions about how-to guides
    - intent: ["content"] only
-3. type: "general" - General questions or greetings
+
+3. type: "general" - ONLY for greetings
+   - Only for: "สวัสดี", "ขอบคุณ", "ลาก่อน"
    - intent: ["general"] only
 
 For price-related questions, you MUST extract specific price conditions in this format:
@@ -85,6 +93,13 @@ Examples:
    {{
       "type": "general",
       "intents": ["general"],
+      "search_text": ""
+   }}
+
+4. "มีสินค้าอะไรบ้าง"
+   {{
+      "type": "product",
+      "intents": ["product"],
       "search_text": ""
    }}
 
