@@ -35,6 +35,14 @@ class IntentClassifier:
         
         instruction = f"""You are an expert in question analysis. For the given message, analyze and extract price conditions if present.
 
+Message types and intents:
+1. type: "product" - Questions about products
+   - intent: ["product"] only
+2. type: "content" - Questions about content/articles
+   - intent: ["content"] only
+3. type: "general" - General questions or greetings
+   - intent: ["general"] only
+
 For price-related questions, you MUST extract specific price conditions in this format:
 - operator: Use these symbols only
   * "=" for exact price
@@ -58,15 +66,27 @@ For search_text extraction:
    - Industry or usage context
    - Brand names if mentioned
 
-Examples of price extraction:
-- "ราคาต่ำกว่า 10 บาท" -> {{"operator": "<", "value": 10}}
-- "สินค้าราคาไม่เกิน 100" -> {{"operator": "<=", "value": 100}}
-- "ราคา 200-300 บาท" -> {{"operator": "between", "value": [200, 300]}}
+Examples:
+1. "สบู่สำหรับโรงแรมมีไหม"
+   {{
+      "type": "product",
+      "intents": ["product"],
+      "search_text": "สบู่ โรงแรม"
+   }}
 
-Examples of search_text:
-- "สบู่เหลวราคาไม่เกิน 10 บาท" -> search_text: "สบู่เหลว"
-- "หาสบู่โรงแรมราคา 4-8 บาท" -> search_text: "สบู่ โรงแรม"
-- "สินค้าราคา 4-8 บาท" -> search_text: ""
+2. "อยากดูบทความเกี่ยวกับสบู่"
+   {{
+      "type": "content",
+      "intents": ["content"],
+      "search_text": "สบู่"
+   }}
+
+3. "สวัสดีค่ะ"
+   {{
+      "type": "general",
+      "intents": ["general"],
+      "search_text": ""
+   }}
 
 Please respond in JSON format with:
 {{
@@ -74,8 +94,8 @@ Please respond in JSON format with:
         {{
             "original_question": "Original text",
             "search_text": "Clean search text without price and generic terms",
-            "type": "product/content/greeting/general",
-            "intents": ["intent1", "intent2"],
+            "type": "product/content/general",
+            "intents": ["product"/"content"/"general"],
             "price_condition": {{price condition object if any}},
             "industry": ["industry1", "industry2"]
         }}
