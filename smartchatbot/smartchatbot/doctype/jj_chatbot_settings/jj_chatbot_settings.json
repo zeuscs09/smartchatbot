@@ -5,12 +5,22 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "ai_api_endpoint",
-  "ai_api_token",
+  "section_break_nfoj",
+  "ai_provider",
   "ai_embedding_model",
-  "column_break_wxxu",
-  "ai_model",
   "ai_system_instruction",
+  "section_break_ktwh",
+  "ai_model",
+  "column_break_wxxu",
+  "ai_api_token",
+  "section_break_lixy",
+  "typhoon_model",
+  "column_break_udsj",
+  "typhoon_token",
+  "section_break_kszs",
+  "gemini_model",
+  "column_break_waxk",
+  "gemini_token",
   "qdrant_section",
   "qdrant_endpoint",
   "qdrant_token",
@@ -21,11 +31,7 @@
  ],
  "fields": [
   {
-   "fieldname": "ai_api_endpoint",
-   "fieldtype": "Data",
-   "label": "AI Api Endpoint"
-  },
-  {
+   "description": "Token For OpenAi",
    "fieldname": "ai_api_token",
    "fieldtype": "Password",
    "label": "AI Api Token"
@@ -70,6 +76,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Model For OpenAi",
    "fieldname": "ai_model",
    "fieldtype": "Data",
    "label": "Ai Model"
@@ -83,12 +90,62 @@
    "fieldname": "ai_embedding_model",
    "fieldtype": "Data",
    "label": "Ai Embed vector model"
+  },
+  {
+   "fieldname": "section_break_nfoj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "ai_provider",
+   "fieldtype": "Select",
+   "label": "AI Provider",
+   "options": "Open Ai\nTyphoon\nGemini"
+  },
+  {
+   "fieldname": "section_break_ktwh",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_lixy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "typhoon_model",
+   "fieldtype": "Data",
+   "label": "Typhoon Model"
+  },
+  {
+   "fieldname": "column_break_udsj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "typhoon_token",
+   "fieldtype": "Password",
+   "label": "Typhoon Token"
+  },
+  {
+   "fieldname": "section_break_kszs",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "gemini_model",
+   "fieldtype": "Data",
+   "label": "Gemini Model"
+  },
+  {
+   "fieldname": "column_break_waxk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gemini_token",
+   "fieldtype": "Password",
+   "label": "Gemini Token"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-10 12:23:20.002818",
+ "modified": "2025-02-19 11:17:29.255391",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chatbot Settings",
