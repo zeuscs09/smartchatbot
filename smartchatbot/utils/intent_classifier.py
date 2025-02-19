@@ -33,23 +33,61 @@ class IntentClassifier:
         content_types = data.get("content_types", [])
         product_categories = data.get("product_categories", [])
         
-        instruction = f"""You are an expert in question analysis. For the given message, analyze and extract price conditions if present.
+        instruction = f"""You are an expert in multilingual question analysis. For the given message in any language, analyze and extract price conditions if present.
 
 Message types and intents:
-1. type: "product" - Questions about products
+1. type: "product" - Questions about products ONLY
    - Questions about products, prices, or inventory
-   - Questions like "มีอะไรบ้าง", "มีสินค้าอะไร"
-   - Questions about specific products
-   - intent: ["product"] only
+   - Examples in multiple languages:
+     * English: "What products do you have", "Show me products"
+     * Japanese: "商品を見せてください", "製品はありますか"
+     * Chinese: "有什么产品", "展示产品"
+     * Thai: "มีสินค้าอะไรบ้าง", "สินค้าราคาเท่าไร"
+   - Keywords in multiple languages:
+     * English: "products", "price", "items"
+     * Japanese: "商品", "製品", "価格"
+     * Chinese: "产品", "价格", "商品"
+     * Thai: "สินค้า", "ราคา"
+   - intent: ["product"] - Search in products ONLY
 
-2. type: "content" - Questions about content/articles
-   - Questions about articles or information
-   - Questions about how-to guides
-   - intent: ["content"] only
+2. type: "content" - Questions about content/articles ONLY
+   - Questions about articles, guides, information
+   - Examples in multiple languages:
+     * English: "Any articles?", "Show me information"
+     * Japanese: "記事はありますか", "情報を見せてください"
+     * Chinese: "有什么文章", "显示信息"
+     * Thai: "มีบทความอะไรบ้าง", "ข้อมูลมีอะไรบ้าง"
+   - Keywords in multiple languages:
+     * English: "articles", "information", "guides"
+     * Japanese: "記事", "情報", "ガイド"
+     * Chinese: "文章", "信息", "指南"
+     * Thai: "บทความ", "ข้อมูล", "คู่มือ"
+   - intent: ["content"] - Search in content ONLY
 
-3. type: "general" - ONLY for greetings
-   - Only for: "สวัสดี", "ขอบคุณ", "ลาก่อน"
-   - intent: ["general"] only
+3. type: "all" - Questions about both products and content
+   - General questions that could relate to both
+   - Examples in multiple languages:
+     * English: "Tell me about soap"
+     * Japanese: "石鹸について教えてください"
+     * Chinese: "告诉我关于肥皂的信息"
+     * Thai: "เกี่ยวกับสบู่มีอะไรบ้าง"
+   - intent: ["all"] - Search in BOTH products and content
+
+4. type: "general" - General conversation
+   - Greetings and small talk only
+   - Examples in multiple languages:
+     * English: "Hello", "Thank you"
+     * Japanese: "こんにちは", "ありがとう"
+     * Chinese: "你好", "谢谢"
+     * Thai: "สวัสดี", "ขอบคุณ"
+   - intent: ["general"] - No search needed
+
+Important classification rules:
+1. Detect the language and analyze the intent based on that language's context
+2. For product-related questions -> Always type "product"
+3. For information/article questions -> Always type "content"
+4. For questions that could refer to both -> Always type "all"
+5. For greetings/small talk -> Always type "general"
 
 For price-related questions, you MUST extract specific price conditions in this format:
 - operator: Use these symbols only
@@ -63,8 +101,8 @@ For price-related questions, you MUST extract specific price conditions in this 
 
 For search_text extraction:
 1. REMOVE these words:
-   - Price related: "ราคา", "บาท", "ไม่เกิน", "ต่ำกว่า", "สูงกว่า", "ระหว่าง", "ถึง"
-   - Generic terms: "สินค้า", "ของ", "อยากได้", "มี", "หา", "ขอ", "ดู", "เกี่ยวกับ"
+   - Price related: "price", "baht", "ราคา", "บาท", "cost", "not more than"
+   - Generic terms: "product", "item", "สินค้า", "want", "show", "find", "about"
    - Price numbers and units
 
 2. KEEP these words:
@@ -73,35 +111,6 @@ For search_text extraction:
    - Specific product attributes and descriptions
    - Industry or usage context
    - Brand names if mentioned
-
-Examples:
-1. "สบู่สำหรับโรงแรมมีไหม"
-   {{
-      "type": "product",
-      "intents": ["product"],
-      "search_text": "สบู่ โรงแรม"
-   }}
-
-2. "อยากดูบทความเกี่ยวกับสบู่"
-   {{
-      "type": "content",
-      "intents": ["content"],
-      "search_text": "สบู่"
-   }}
-
-3. "สวัสดีค่ะ"
-   {{
-      "type": "general",
-      "intents": ["general"],
-      "search_text": ""
-   }}
-
-4. "มีสินค้าอะไรบ้าง"
-   {{
-      "type": "product",
-      "intents": ["product"],
-      "search_text": ""
-   }}
 
 Please respond in JSON format with:
 {{
@@ -127,6 +136,7 @@ If no specific product, content, or attribute is mentioned, search_text should b
 
         try:
             response = self.ai_client.chat_completion(
+                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": instruction},
                     {"role": "user", "content": decoded_text}

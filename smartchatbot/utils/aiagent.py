@@ -182,10 +182,12 @@ def reply_message(message: str, session_id: str) -> Dict:
         
         questions = intent_response["questions"]
         
-        # ใช้ search_text แทน original_question
-        search_texts = [q['search_text'] for q in questions if q['type'] in ['product', 'content']]
-        questions_text = " ".join(search_texts) 
-
+        search_texts = [q['original_question'] for q in questions if q['type'] in ['product', 'content','all']]
+        questions_text = " ".join(search_texts)
+        # if not questions_text:
+        #     search_texts = [q['original_question'] for q in questions if q['type'] in ['product', 'content','all']]
+        #     questions_text = " ".join(search_texts)
+        
         # สร้าง chat history
         chat_history = frappe.get_doc({
             "doctype": "JJ Chat History",
@@ -215,12 +217,31 @@ def reply_message(message: str, session_id: str) -> Dict:
                 "products": [],
                 "content": []
             }
-            
-        # ถ้าไม่ใช่ greeting ค่อยทำการค้นหาข้อมูล
+        frappe.log_error(title="Question text", message=f"Questions: {questions_text}")
         vector = agent.qdrant.get_embedding(questions_text)
         
         # สร้าง filter conditions จาก price_condition
         filter_conditions = None
+        # ตรวจสอบ intent type และสร้าง filter
+        if questions[0]['type'] == 'product':
+            filter_conditions = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="doctype",
+                        match=models.MatchValue(value="JJ Product")
+                    )
+                ]
+            )
+        elif questions[0]['type'] == 'content':
+            filter_conditions = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="doctype",
+                        match=models.MatchValue(value="JJ Content")
+                    )
+                ]
+            )
+            
         price_conditions = [q.get('price_condition') for q in questions if q.get('price_condition')]
         
         if price_conditions:
@@ -285,23 +306,16 @@ def reply_message(message: str, session_id: str) -> Dict:
                     *conditions
                 ]
             )
-            
-            frappe.log_error(
-                title="Price Filter Debug",
-                message=f"""
-                Price Conditions: {price_conditions}
-                Filter Applied: {filter_conditions}
-                """
-            )
         
-        # ค้นหาด้วย vector และ filter (ถ้ามี)
+        # ปรับการค้นหาด้วย vector
         search_results = agent.qdrant.client.search(
             collection_name="jj_data",
             query_vector=vector,
             limit=20,
-            score_threshold=0.2,
+            score_threshold=0.05,  # ลดลงอีกเพื่อทดสอบ
             search_params=models.SearchParams(
-                hnsw_ef=512
+                hnsw_ef=512,
+                exact=True  # เพิ่มการค้นหาแบบ exact
             ),
             query_filter=filter_conditions
         )
@@ -309,18 +323,6 @@ def reply_message(message: str, session_id: str) -> Dict:
         # แยกประเภทตาม doctype
         product_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Product']
         content_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Content']
-        
-        frappe.log_error(
-            title="Search Results Debug",
-            message=f"""
-            Query: {questions_text}
-            Has Price Filter: {bool(filter_conditions)}
-            Total Results: {len(search_results)}
-            Product Results: {len(product_results)}
-            Content Results: {len(content_results)}
-            First Result Score: {search_results[0].score if search_results else 'No results'}
-            """
-        )
         
         # เก็บ products ก่อนสร้าง context
         products = []
@@ -368,39 +370,42 @@ def reply_message(message: str, session_id: str) -> Dict:
                 context += f"รูปภาพ: {payload['image_url']}\n"
         
         temperature=0.2
-        if all_results:  # เปลี่ยนจาก products เป็น all_results
+        if all_results:
             instruction = """You are a knowledgeable assistant. Please answer questions following these guidelines:
 1. Be concise and to the point
 2. For price-related questions, specify exact prices
 3. For multiple items, list them with bullet points
-4. Use friendly and polite Thai language
+4. Use friendly and polite language
 5. Include image links when asked about images
 6. For products under 100 baht, emphasize value for money
 7. For products with multiple sizes, recommend based on usage
 8. For content/articles, highlight key information
 9. Do not use any markdown formatting
-10. Response must be in Thai language"""
+10. Always respond in the same language as the user's question"""
 
-            summary_instruction = """Summarize the information in Thai language:
-1. Number of relevant items (both products and content)
-2. Price range (if products)
-3. Key features or information points
-Note: Keep it within 2 lines, no markdown formatting"""
+            summary_instruction = """Create a brief summary that matches the main response:
+1. Use exactly the same language as the user's question
+2. Include number of items and price range
+3. Highlight key features
+4. Keep the same tone and style
+5. No markdown formatting
+6. Must be consistent with the main response content"""
 
         else:
             instruction = """You are a helpful customer service agent. The user asked about our products/services, 
             but we couldn't find exact matching information. Please:
-            1. Politely inform that we don't have the exact information
-            2. Suggest how they might rephrase their question
-            3. Offer to help find alternative products/information
-            4. Keep the tone friendly and professional
-            5. Use Thai language
-            6. Do not make up any product information"""
+1. Politely inform that we don't have the exact information
+2. Suggest how they might rephrase their question
+3. Offer to help find alternative products/information
+4. Keep the tone friendly and professional
+5. Do not make up any product information
+6. Always respond in the same language as the user's question"""
 
-            summary_instruction = """Summarize the answer in Thai language:
-1. Keep it within 1 line
-2. No markdown formatting
-3. Maintain friendly tone"""
+            summary_instruction = """Create a brief summary that:
+1. Uses exactly the same language as the user's question
+2. Maintains the same tone and style
+3. Summarizes the key points
+4. Is consistent with the main response"""
 
         # สร้างคำตอบละเอียด
         final_response = agent.ai_client.chat_completion(

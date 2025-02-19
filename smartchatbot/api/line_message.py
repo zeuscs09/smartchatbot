@@ -61,93 +61,67 @@ def create_message_handler(doc, handler, configuration):
                         if image_url and not image_url.startswith('http'):
                             image_url = frappe.utils.get_url(image_url)
                         
+                        # จัดการราคา
+                        price = product.get('price', 0)
+                        price_text = f"฿{price:,.2f}" if price else "ไม่ระบุราคา"
+                        
                         bubble = {
                             "type": "bubble",
+                            "hero": {
+                                "type": "image",
+                                "url": image_url,
+                                "size": "full",
+                                "aspectRatio": "20:13",
+                                "aspectMode": "cover"
+                            },
                             "body": {
                                 "type": "box",
                                 "layout": "vertical",
+                                "spacing": "sm",
                                 "contents": [
                                     {
-                                        "type": "image",
-                                        "url": image_url,
-                                        "size": "full",
-                                        "aspectMode": "cover",
-                                        "aspectRatio": "2:3",
-                                        "gravity": "top"
+                                        "type": "text",
+                                        "text": product.get('title', ''),
+                                        "weight": "bold",
+                                        "size": "md",
+                                        "wrap": True
                                     },
                                     {
                                         "type": "box",
-                                        "layout": "vertical",
+                                        "layout": "baseline",
                                         "contents": [
                                             {
-                                                "type": "box",
-                                                "layout": "vertical",
-                                                "contents": [
-                                                    {
-                                                        "type": "text",
-                                                        "text": product.get('title', ''),
-                                                        "size": "xl",
-                                                        "color": "#ffffff",
-                                                        "weight": "bold"
-                                                    }
-                                                ]
+                                                "type": "text",
+                                                "text": "ราคา: ",
+                                                "size": "sm",
+                                                "color": "#666666"
                                             },
                                             {
-                                                "type": "box",
-                                                "layout": "baseline",
-                                                "contents": [
-                                                    {
-                                                        "type": "text",
-                                                        "text": f"฿{product.get('price', 0):,.0f}",
-                                                        "color": "#ebebeb",
-                                                        "size": "sm",
-                                                        "flex": 0
-                                                    }
-                                                ],
-                                                "spacing": "lg"
-                                            },
-                                            {
-                                                "type": "box",
-                                                "layout": "vertical",
-                                                "contents": [
-                                                    {
-                                                        "type": "box",
-                                                        "layout": "baseline",
-                                                        "contents": [
-                                                            {
-                                                                "type": "text",
-                                                                "text": "ดูรายละเอียด",
-                                                                "color": "#ffffff",
-                                                                "flex": 0,
-                                                                "align": "center",
-                                                                "gravity": "center"
-                                                            }
-                                                        ],
-                                                        "spacing": "sm",
-                                                        "action": {
-                                                            "type": "uri",
-                                                            "uri": f"{frappe.utils.get_url()}/product?name={product.get('name', '')}"
-                                                        }
-                                                    }
-                                                ],
-                                                "borderWidth": "1px",
-                                                "cornerRadius": "4px",
-                                                "spacing": "sm",
-                                                "borderColor": "#ffffff",
-                                                "margin": "xxl",
-                                                "height": "40px"
+                                                "type": "text",
+                                                "text": price_text,
+                                                "size": "sm",
+                                                "color": "#D23F31",
+                                                "weight": "bold"
                                             }
-                                        ],
-                                        "position": "absolute",
-                                        "offsetBottom": "0px",
-                                        "offsetStart": "0px",
-                                        "offsetEnd": "0px",
-                                        "backgroundColor": "#03303Acc",
-                                        "paddingAll": "20px",
-                                        "paddingTop": "18px"
+                                        ]
                                     }
-                                ],
-                                "paddingAll": "0px"
+                                ]
+                            },
+                            "footer": {
+                                "type": "box",
+                                "layout": "vertical",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "button",
+                                        "action": {
+                                            "type": "uri",
+                                            "label": "ดูรายละเอียด",
+                                            "uri": f"{frappe.utils.get_url()}/product?name={product.get('name', '')}"
+                                        },
+                                        "style": "primary"
+                                    }
+                                ]
                             }
                         }
                         flex_contents["contents"].append(bubble)
