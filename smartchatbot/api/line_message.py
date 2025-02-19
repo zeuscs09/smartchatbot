@@ -63,49 +63,91 @@ def create_message_handler(doc, handler, configuration):
                         
                         bubble = {
                             "type": "bubble",
-                            "hero": {
-                                "type": "image",
-                                "url": image_url,
-                                "size": "full",
-                                "aspectRatio": "20:13",
-                                "aspectMode": "cover"
-                            },
                             "body": {
                                 "type": "box",
                                 "layout": "vertical",
-                                "spacing": "sm",
                                 "contents": [
                                     {
-                                        "type": "text",
-                                        "text": product.get('title', ''),
-                                        "weight": "bold",
-                                        "size": "md",
-                                        "wrap": True
+                                        "type": "image",
+                                        "url": image_url,
+                                        "size": "full",
+                                        "aspectMode": "cover",
+                                        "aspectRatio": "2:3",
+                                        "gravity": "top"
                                     },
                                     {
-                                        "type": "text",
-                                        "text": f"฿{product.get('price', 0):,.0f}",
-                                        "size": "xl",
-                                        "weight": "bold",
-                                        "color": "#D53600"
+                                        "type": "box",
+                                        "layout": "vertical",
+                                        "contents": [
+                                            {
+                                                "type": "box",
+                                                "layout": "vertical",
+                                                "contents": [
+                                                    {
+                                                        "type": "text",
+                                                        "text": product.get('title', ''),
+                                                        "size": "xl",
+                                                        "color": "#ffffff",
+                                                        "weight": "bold"
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "type": "box",
+                                                "layout": "baseline",
+                                                "contents": [
+                                                    {
+                                                        "type": "text",
+                                                        "text": f"฿{product.get('price', 0):,.0f}",
+                                                        "color": "#ebebeb",
+                                                        "size": "sm",
+                                                        "flex": 0
+                                                    }
+                                                ],
+                                                "spacing": "lg"
+                                            },
+                                            {
+                                                "type": "box",
+                                                "layout": "vertical",
+                                                "contents": [
+                                                    {
+                                                        "type": "box",
+                                                        "layout": "baseline",
+                                                        "contents": [
+                                                            {
+                                                                "type": "text",
+                                                                "text": "ดูรายละเอียด",
+                                                                "color": "#ffffff",
+                                                                "flex": 0,
+                                                                "align": "center",
+                                                                "gravity": "center"
+                                                            }
+                                                        ],
+                                                        "spacing": "sm",
+                                                        "action": {
+                                                            "type": "uri",
+                                                            "uri": f"{frappe.utils.get_url()}/product?name={product.get('name', '')}"
+                                                        }
+                                                    }
+                                                ],
+                                                "borderWidth": "1px",
+                                                "cornerRadius": "4px",
+                                                "spacing": "sm",
+                                                "borderColor": "#ffffff",
+                                                "margin": "xxl",
+                                                "height": "40px"
+                                            }
+                                        ],
+                                        "position": "absolute",
+                                        "offsetBottom": "0px",
+                                        "offsetStart": "0px",
+                                        "offsetEnd": "0px",
+                                        "backgroundColor": "#03303Acc",
+                                        "paddingAll": "20px",
+                                        "paddingTop": "18px"
                                     }
-                                ]
-                            },
-                            "footer": {
-                                "type": "box",
-                                "layout": "vertical",
-                                "spacing": "sm",
-                                "contents": [
-                                    {
-                                        "type": "button",
-                                        "action": {
-                                            "type": "uri",
-                                            "label": "ดูรายละเอียด",
-                                            "uri": f"{frappe.utils.get_url()}/line/products/{product.get('name', '')}"
-                                        },
-                                        "style": "primary"
-                                    }
-                                ]
+                                ],
+                                "paddingAll": "0px"
                             }
                         }
                         flex_contents["contents"].append(bubble)
@@ -164,7 +206,7 @@ def create_message_handler(doc, handler, configuration):
                                         "action": {
                                             "type": "uri",
                                             "label": "ดูรายละเอียด",
-                                            "uri": f"{frappe.utils.get_url()}/line/content/{content.get('name', '')}"
+                                            "uri": f"{frappe.utils.get_url()}/content?name={content.get('name', '')}"
                                         },
                                         "style": "primary"
                                     }
