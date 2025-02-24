@@ -182,6 +182,23 @@ def reply_message(message: str, session_id: str) -> Dict:
         
         questions = intent_response["questions"]
         
+        # ดึง limit และ category จาก intent analysis
+        result_limit = 20  # ค่าเริ่มต้น
+        category_filter = None
+        
+        for q in questions:
+            if q.get('limit'):
+                result_limit = min(q['limit'], 20)
+            if q.get('category'):  # เพิ่มการตรวจสอบ category
+                category_filter = models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="product_categories",  # แก้เป็น product_categories ตาม schema
+                            match=models.MatchValue(value=q['category'])
+                        )
+                    ]
+                )
+
         search_texts = [q['original_question'] for q in questions if q['type'] in ['product', 'content','all']]
         questions_text = " ".join(search_texts)
         # if not questions_text:
@@ -222,7 +239,6 @@ def reply_message(message: str, session_id: str) -> Dict:
         
         # สร้าง filter conditions จาก price_condition
         filter_conditions = None
-        # ตรวจสอบ intent type และสร้าง filter
         if questions[0]['type'] == 'product':
             filter_conditions = models.Filter(
                 must=[
@@ -232,16 +248,10 @@ def reply_message(message: str, session_id: str) -> Dict:
                     )
                 ]
             )
-        elif questions[0]['type'] == 'content':
-            filter_conditions = models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="doctype",
-                        match=models.MatchValue(value="JJ Content")
-                    )
-                ]
-            )
-            
+            # ถ้ามี category filter ให้เพิ่มเข้าไปใน must conditions
+            if category_filter:
+                filter_conditions.must.extend(category_filter.must)
+
         price_conditions = [q.get('price_condition') for q in questions if q.get('price_condition')]
         
         if price_conditions:
@@ -307,15 +317,15 @@ def reply_message(message: str, session_id: str) -> Dict:
                 ]
             )
         
-        # ปรับการค้นหาด้วย vector
+        # ปรับการค้นหาด้วย vector โดยใช้ limit ที่วิเคราะห์ได้
         search_results = agent.qdrant.client.search(
             collection_name="jj_data",
             query_vector=vector,
-            limit=20,
-            score_threshold=0.05,  # ลดลงอีกเพื่อทดสอบ
+            limit=result_limit,  # ใช้ limit ที่วิเคราะห์ได้
+            score_threshold=0.05,
             search_params=models.SearchParams(
                 hnsw_ef=512,
-                exact=True  # เพิ่มการค้นหาแบบ exact
+                exact=True
             ),
             query_filter=filter_conditions
         )

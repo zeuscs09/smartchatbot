@@ -16,8 +16,8 @@ class IntentClassifier:
         
         product_categories = frappe.get_all(
             "JJ Product Category",
-            fields=["description"],
-            pluck="description"
+            fields=["name", "description"],  # เพิ่ม name เพื่อใช้เป็น category code
+            as_list=False
         )
         
         return {
@@ -33,7 +33,12 @@ class IntentClassifier:
         content_types = data.get("content_types", [])
         product_categories = data.get("product_categories", [])
         
-        instruction = f"""You are an expert in multilingual question analysis. For the given message in any language, analyze and extract price conditions if present.
+        # สร้าง category mapping สำหรับแสดงใน instruction
+        category_examples = []
+        for cat in product_categories:
+            category_examples.append(f"* {cat.get('description')} -> category: \"{cat.get('name')}\"")
+        
+        instruction = f"""You are an expert in multilingual question analysis. For the given message in any language, analyze and extract price conditions, result limits and product categories if present.
 
 Message types and intents:
 1. type: "product" - Questions about products ONLY
@@ -106,22 +111,46 @@ For search_text extraction:
    - Price numbers and units
 
 2. KEEP these words:
-   - Product categories: {", ".join(product_categories)}
+   - Product categories: {", ".join([cat.get('description') for cat in product_categories])}
    - Content types: {", ".join(content_types)}
    - Specific product attributes and descriptions
    - Industry or usage context
    - Brand names if mentioned
+
+For result limit analysis:
+1. Check for number-related keywords in any language:
+   * English: "show me 5 items", "list 10 products", "first 3"
+   * Japanese: "3つ見せて", "5個の商品"
+   * Chinese: "显示5个", "前3个产品"
+   * Thai: "แสดง 5 อัน", "3 รายการแรก"
+
+2. Extract limit number if found:
+   * Exact numbers: "5 items" -> limit: 5
+   * Words to numbers: "five products" -> limit: 5
+   * Default if not specified: limit: null
+
+Available product categories:
+{chr(10).join(category_examples)}
+
+For category analysis:
+1. Match user's query with available categories
+2. Consider both exact and semantic matches
+3. Support multiple languages (Thai, English, Japanese, Chinese)
+4. Return category code (name) not description
+5. Return null if no clear category match
 
 Please respond in JSON format with:
 {{
     "questions": [
         {{
             "original_question": "Original text",
-            "search_text": "Clean search text without price and generic terms",
+            "search_text": "Clean search text",
             "type": "product/content/general",
             "intents": ["product"/"content"/"general"],
             "price_condition": {{price condition object if any}},
-            "industry": ["industry1", "industry2"]
+            "industry": ["industry1", "industry2"],
+            "limit": number or null,
+            "category": "CATEGORY_CODE" or null
         }}
     ]
 }}
@@ -161,7 +190,10 @@ If no specific product, content, or attribute is mentioned, search_text should b
             }
             
         except Exception as e:
-            frappe.log_error(title="Error in intent analysis", message=f"Error in intent analysis: {str(e)}\nResponse: {response}")
+            frappe.log_error(
+                title="Error in intent analysis", 
+                message=f"Error in intent analysis: {str(e)}\nResponse: {response}"
+            )
             return {
                 "questions": [{
                     "original_question": decoded_text,
@@ -169,7 +201,9 @@ If no specific product, content, or attribute is mentioned, search_text should b
                     "type": "general",
                     "intents": [],
                     "price_condition": None,
-                    "industry": []
+                    "industry": [],
+                    "limit": None,
+                    "category": None  # เพิ่ม default category เป็น null
                 }],
                 "usage": response.get("usage", {})
             }
