@@ -38,6 +38,7 @@ def create_message_handler(doc, handler, configuration):
             response = reply_message(user_message, doc.user_id)
             frappe.log_error(title="LINE Debug", message=f"Response: {response}")
             messages = []
+
             if isinstance(response, dict):
                 # ส่ง summary_text ก่อนเสมอถ้ามี
                 if 'summary_text' in response and response['summary_text']:
@@ -48,170 +49,215 @@ def create_message_handler(doc, handler, configuration):
                     messages.append(TextMessage(text=response['text']))
                     reply_text = response['text']
                 
-                # ถ้ามี products จึงแสดง flex message สำหรับสินค้า
+                # แบ่งสินค้าเป็นชุดละ 12 รายการ
                 if 'products' in response and response['products']:
-                    flex_contents = {
-                        "type": "carousel",
-                        "contents": []
-                    }
+                    product_batches = [response['products'][i:i + 12] for i in range(0, len(response['products']), 12)]
                     
-                    for product in response['products']:
-                        # ตรวจสอบและแปลง image URL
-                        image_url = product.get('image_url', '')
-                        if image_url and not image_url.startswith('http'):
-                            image_url = frappe.utils.get_url(image_url)
+                    for i, batch in enumerate(product_batches):
+                        flex_contents = {
+                            "type": "carousel",
+                            "contents": []
+                        }
                         
-                        # จัดการราคา
-                        price = product.get('price', 0)
-                        price_text = f"฿{price:,.2f}" if price else "ไม่ระบุราคา"
+                        for product in batch:
+                            # ตรวจสอบและแปลง image URL
+                            image_url = product.get('image_url', '')
+                            if image_url and not image_url.startswith('http'):
+                                image_url = frappe.utils.get_url(image_url)
+                            
+                            # จัดการราคา
+                            price = product.get('price', 0)
+                            price_text = f"฿{price:,.2f}" if price else "ไม่ระบุราคา"
+                            
+                            bubble = {
+                                "type": "bubble",
+                                "hero": {
+                                    "type": "image",
+                                    "url": image_url,
+                                    "size": "full",
+                                    "aspectRatio": "20:13",
+                                    "aspectMode": "cover"
+                                },
+                                "body": {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "spacing": "sm",
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": product.get('title', ''),
+                                            "weight": "bold",
+                                            "size": "md",
+                                            "wrap": True
+                                        },
+                                        {
+                                            "type": "box",
+                                            "layout": "baseline",
+                                            "contents": [
+                                                {
+                                                    "type": "text",
+                                                    "text": "ราคา: ",
+                                                    "size": "sm",
+                                                    "color": "#666666"
+                                                },
+                                                {
+                                                    "type": "text",
+                                                    "text": price_text,
+                                                    "size": "sm",
+                                                    "color": "#D23F31",
+                                                    "weight": "bold"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "footer": {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "spacing": "sm",
+                                    "contents": [
+                                        {
+                                            "type": "button",
+                                            "action": {
+                                                "type": "uri",
+                                                "label": "ดูรายละเอียด",
+                                                "uri": f"{frappe.utils.get_url()}/product?name={product.get('name', '')}"
+                                            },
+                                            "style": "primary"
+                                        }
+                                    ]
+                                }
+                            }
+                            flex_contents["contents"].append(bubble)
                         
-                        bubble = {
+                        # เพิ่มข้อความแสดงหน้า
+                        page_bubble = {
                             "type": "bubble",
-                            "hero": {
-                                "type": "image",
-                                "url": image_url,
-                                "size": "full",
-                                "aspectRatio": "20:13",
-                                "aspectMode": "cover"
-                            },
                             "body": {
                                 "type": "box",
                                 "layout": "vertical",
-                                "spacing": "sm",
                                 "contents": [
                                     {
                                         "type": "text",
-                                        "text": product.get('title', ''),
+                                        "text": f"หน้า {i + 1}/{len(product_batches)}",
                                         "weight": "bold",
                                         "size": "md",
-                                        "wrap": True
-                                    },
-                                    {
-                                        "type": "box",
-                                        "layout": "baseline",
-                                        "contents": [
-                                            {
-                                                "type": "text",
-                                                "text": "ราคา: ",
-                                                "size": "sm",
-                                                "color": "#666666"
-                                            },
-                                            {
-                                                "type": "text",
-                                                "text": price_text,
-                                                "size": "sm",
-                                                "color": "#D23F31",
-                                                "weight": "bold"
-                                            }
-                                        ]
-                                    }
-                                ]
-                            },
-                            "footer": {
-                                "type": "box",
-                                "layout": "vertical",
-                                "spacing": "sm",
-                                "contents": [
-                                    {
-                                        "type": "button",
-                                        "action": {
-                                            "type": "uri",
-                                            "label": "ดูรายละเอียด",
-                                            "uri": f"{frappe.utils.get_url()}/product?name={product.get('name', '')}"
-                                        },
-                                        "style": "primary"
+                                        "align": "center"
                                     }
                                 ]
                             }
                         }
-                        flex_contents["contents"].append(bubble)
-                    
-                    if flex_contents["contents"]:
+                        flex_contents["contents"].append(page_bubble)
+                        
                         messages.append(
                             FlexMessage(
-                                alt_text="รายการสินค้า",
+                                alt_text=f"รายการสินค้า (หน้า {i + 1}/{len(product_batches)})",
                                 contents=FlexContainer.from_dict(flex_contents)
                             )
                         )
-                
-                # เพิ่ม flex message สำหรับ content
+
+                # ทำแบบเดียวกันกับ content
                 if 'content' in response and response['content']:
-                    content_flex = {
-                        "type": "carousel",
-                        "contents": []
-                    }
+                    content_batches = [response['content'][i:i + 12] for i in range(0, len(response['content']), 12)]
                     
-                    for content in response['content']:
-                        # ตรวจสอบและแปลง image URL
-                        image_url = content.get('image_url', '')
-                        if image_url and not image_url.startswith('http'):
-                            image_url = frappe.utils.get_url(image_url)
+                    for i, batch in enumerate(content_batches):
+                        content_flex = {
+                            "type": "carousel",
+                            "contents": []
+                        }
                         
-                        bubble = {
+                        for content in batch:
+                            # ตรวจสอบและแปลง image URL
+                            image_url = content.get('image_url', '')
+                            if image_url and not image_url.startswith('http'):
+                                image_url = frappe.utils.get_url(image_url)
+                            
+                            bubble = {
+                                "type": "bubble",
+                                "hero": {
+                                    "type": "image",
+                                    "url": image_url,
+                                    "size": "full",
+                                    "aspectRatio": "20:13",
+                                    "aspectMode": "cover"
+                                },
+                                "body": {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "spacing": "sm",
+                                    "contents": [
+                                        {
+                                            "type": "text",
+                                            "text": content.get('title', ''),
+                                            "weight": "bold",
+                                            "size": "md",
+                                            "wrap": True
+                                        }
+                                    ]
+                                },
+                                "footer": {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "spacing": "sm",
+                                    "contents": [
+                                        {
+                                            "type": "button",
+                                            "action": {
+                                                "type": "uri",
+                                                "label": "ดูรายละเอียด",
+                                                "uri": f"{frappe.utils.get_url()}/content?name={content.get('name', '')}"
+                                            },
+                                            "style": "primary"
+                                        }
+                                    ]
+                                }
+                            }
+                            content_flex["contents"].append(bubble)
+                        
+                        # เพิ่มข้อความแสดงหน้า
+                        page_bubble = {
                             "type": "bubble",
-                            "hero": {
-                                "type": "image",
-                                "url": image_url,
-                                "size": "full",
-                                "aspectRatio": "20:13",
-                                "aspectMode": "cover"
-                            },
                             "body": {
                                 "type": "box",
                                 "layout": "vertical",
-                                "spacing": "sm",
                                 "contents": [
                                     {
                                         "type": "text",
-                                        "text": content.get('title', ''),
+                                        "text": f"หน้า {i + 1}/{len(content_batches)}",
                                         "weight": "bold",
                                         "size": "md",
-                                        "wrap": True
-                                    }
-                                ]
-                            },
-                            "footer": {
-                                "type": "box",
-                                "layout": "vertical",
-                                "spacing": "sm",
-                                "contents": [
-                                    {
-                                        "type": "button",
-                                        "action": {
-                                            "type": "uri",
-                                            "label": "ดูรายละเอียด",
-                                            "uri": f"{frappe.utils.get_url()}/content?name={content.get('name', '')}"
-                                        },
-                                        "style": "primary"
+                                        "align": "center"
                                     }
                                 ]
                             }
                         }
-                        content_flex["contents"].append(bubble)
-                    
-                    if content_flex["contents"]:
+                        content_flex["contents"].append(page_bubble)
+                        
                         messages.append(
                             FlexMessage(
-                                alt_text="บทความที่เกี่ยวข้อง",
+                                alt_text=f"บทความที่เกี่ยวข้อง (หน้า {i + 1}/{len(content_batches)})",
                                 contents=FlexContainer.from_dict(content_flex)
                             )
                         )
-                elif not messages:  # ถ้าไม่มีทั้ง text และ products
+
+                elif not messages:  # ถ้าไม่มีทั้ง text และ products/content
                     messages.append(TextMessage(text="ขออภัยค่ะ ไม่พบข้อมูลที่ต้องการ"))
                     reply_text = "ไม่พบข้อมูล"
             else:
                 messages.append(TextMessage(text=str(response)))
                 reply_text = str(response)
             
-            # ส่งข้อความตอบกลับ
+            # ส่งข้อความตอบกลับทีละชุด
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
-                response = line_bot_api.reply_message(
-                    ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=messages
+                for i in range(0, len(messages), 5):  # ส่งทีละ 5 messages
+                    batch_messages = messages[i:i + 5]
+                    response = line_bot_api.reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=batch_messages
+                        )
                     )
-                )
             
             # บันทึกข้อความตอบกลับพร้อมเวลา
             doc.response_text = reply_text
