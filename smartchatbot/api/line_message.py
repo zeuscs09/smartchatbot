@@ -40,25 +40,35 @@ def create_message_handler(doc, handler, configuration):
             messages = []
 
             if isinstance(response, dict):
-                # ส่ง summary_text ก่อนเสมอถ้ามี
+                # ส่ง summary_text หรือ text ก่อน
                 if 'summary_text' in response and response['summary_text']:
                     messages.append(TextMessage(text=response['summary_text']))
                     reply_text = response['summary_text']
-                # ถ้าไม่มี summary_text จึงใช้ text
                 elif 'text' in response and response['text']:
                     messages.append(TextMessage(text=response['text']))
                     reply_text = response['text']
-                
-                # แบ่งสินค้าเป็นชุดละ 12 รายการ
+
+                # จัดการสินค้า
                 if 'products' in response and response['products']:
-                    product_batches = [response['products'][i:i + 12] for i in range(0, len(response['products']), 12)]
+                    # แบ่งสินค้าเป็นชุดละ 11 รายการ (เผื่อที่สำหรับ page bubble)
+                    product_batches = [response['products'][i:i + 11] for i in range(0, len(response['products']), 11)]
                     
+                    # ส่งข้อความแจ้งจำนวนสินค้าทั้งหมด
+                    total_products = len(response['products'])
+                    total_pages = len(product_batches)
+                    if total_products > 11:
+                        messages.append(TextMessage(
+                            text=f"พบสินค้าทั้งหมด {total_products} รายการ แบ่งเป็น {total_pages} หน้า"
+                        ))
+
+                    # สร้าง Flex Message สำหรับแต่ละชุด
                     for i, batch in enumerate(product_batches):
                         flex_contents = {
                             "type": "carousel",
                             "contents": []
                         }
                         
+                        # เพิ่มสินค้าแต่ละรายการ
                         for product in batch:
                             # ตรวจสอบและแปลง image URL
                             image_url = product.get('image_url', '')
@@ -130,7 +140,7 @@ def create_message_handler(doc, handler, configuration):
                             }
                             flex_contents["contents"].append(bubble)
                         
-                        # เพิ่มข้อความแสดงหน้า
+                        # เพิ่ม page bubble (รวมแล้วไม่เกิน 12)
                         page_bubble = {
                             "type": "bubble",
                             "body": {
@@ -139,7 +149,7 @@ def create_message_handler(doc, handler, configuration):
                                 "contents": [
                                     {
                                         "type": "text",
-                                        "text": f"หน้า {i + 1}/{len(product_batches)}",
+                                        "text": f"หน้า {i + 1}/{total_pages}",
                                         "weight": "bold",
                                         "size": "md",
                                         "align": "center"
@@ -149,17 +159,25 @@ def create_message_handler(doc, handler, configuration):
                         }
                         flex_contents["contents"].append(page_bubble)
                         
+                        # เพิ่ม Flex Message เข้า messages list
                         messages.append(
                             FlexMessage(
-                                alt_text=f"รายการสินค้า (หน้า {i + 1}/{len(product_batches)})",
+                                alt_text=f"รายการสินค้า (หน้า {i + 1}/{total_pages})",
                                 contents=FlexContainer.from_dict(flex_contents)
                             )
                         )
 
-                # ทำแบบเดียวกันกับ content
+                # จัดการ content ในรูปแบบเดียวกัน
                 if 'content' in response and response['content']:
-                    content_batches = [response['content'][i:i + 12] for i in range(0, len(response['content']), 12)]
+                    content_batches = [response['content'][i:i + 11] for i in range(0, len(response['content']), 11)]
                     
+                    total_content = len(response['content'])
+                    total_pages = len(content_batches)
+                    if total_content > 11:
+                        messages.append(TextMessage(
+                            text=f"พบบทความทั้งหมด {total_content} รายการ แบ่งเป็น {total_pages} หน้า"
+                        ))
+
                     for i, batch in enumerate(content_batches):
                         content_flex = {
                             "type": "carousel",
@@ -214,7 +232,7 @@ def create_message_handler(doc, handler, configuration):
                             }
                             content_flex["contents"].append(bubble)
                         
-                        # เพิ่มข้อความแสดงหน้า
+                        # เพิ่ม page bubble (รวมแล้วไม่เกิน 12)
                         page_bubble = {
                             "type": "bubble",
                             "body": {
@@ -223,7 +241,7 @@ def create_message_handler(doc, handler, configuration):
                                 "contents": [
                                     {
                                         "type": "text",
-                                        "text": f"หน้า {i + 1}/{len(content_batches)}",
+                                        "text": f"หน้า {i + 1}/{total_pages}",
                                         "weight": "bold",
                                         "size": "md",
                                         "align": "center"
@@ -233,9 +251,10 @@ def create_message_handler(doc, handler, configuration):
                         }
                         content_flex["contents"].append(page_bubble)
                         
+                        # เพิ่ม Flex Message เข้า messages list
                         messages.append(
                             FlexMessage(
-                                alt_text=f"บทความที่เกี่ยวข้อง (หน้า {i + 1}/{len(content_batches)})",
+                                alt_text=f"บทความที่เกี่ยวข้อง (หน้า {i + 1}/{total_pages})",
                                 contents=FlexContainer.from_dict(content_flex)
                             )
                         )
@@ -252,12 +271,13 @@ def create_message_handler(doc, handler, configuration):
                 line_bot_api = MessagingApi(api_client)
                 for i in range(0, len(messages), 5):  # ส่งทีละ 5 messages
                     batch_messages = messages[i:i + 5]
-                    response = line_bot_api.reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=batch_messages
+                    if batch_messages:  # ตรวจสอบว่ามีข้อความที่จะส่ง
+                        response = line_bot_api.reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=batch_messages
+                            )
                         )
-                    )
             
             # บันทึกข้อความตอบกลับพร้อมเวลา
             doc.response_text = reply_text
