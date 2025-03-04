@@ -14,7 +14,6 @@ class AIAgent:
         self.classifier = IntentClassifier()
         self.qdrant = QdrantManager()
    
-
     def get_or_create_session(self, session_id: str = None) -> str:
         """สร้างหรือดึง session ที่มีอยู่"""
         # ถ้ามี session_id ให้ตรวจสอบว่ายังใช้งานได้
@@ -46,8 +45,6 @@ class AIAgent:
             
         # สร้าง session ใหม่
         return f"session_{uuid.uuid4().hex[:12]}"
-
-
 
     def answer_product(self, questions: List[Dict]) -> str:
         """ตอบคำถามเกี่ยวกับสินค้า"""
@@ -189,14 +186,35 @@ def reply_message(message: str, session_id: str) -> Dict:
         for q in questions:
             if q.get('limit'):
                 result_limit = min(q['limit'], 20)
-            if q.get('category'):  # เพิ่มการตรวจสอบ category
+            if q.get('category'):  
+                # Log ค่า category ที่ได้รับมา
+                frappe.log_error(
+                    title="Category Debug",
+                    message=f"""
+                    Original category: {q['category']}
+                    Available categories in Qdrant: สบู่เหลว, แชมพู, body lotion บอดี้โลชั่น, hair conditioner ครีมนวดผม
+                    """
+                )
+                
+                # สร้าง category filter
                 category_filter = models.Filter(
                     must=[
                         models.FieldCondition(
-                            key="product_categories",  # แก้เป็น product_categories ตาม schema
-                            match=models.MatchValue(value=q['category'])
+                            key="product_categories",
+                            match=models.MatchAny(any=[q['category']])
                         )
                     ]
+                )
+                
+                # Log filter ที่สร้าง และข้อมูลเพิ่มเติม
+                frappe.log_error(
+                    title="Category Filter Debug",
+                    message=f"""
+                    Category from intent: {q['category']}
+                    Filter type: {type(category_filter.must[0].match)}
+                    Filter text: {category_filter.must[0].match.text}
+                    Query: SELECT * FROM jj_data WHERE doctype='JJ Product' AND '{q['category']}' IN product_categories
+                    """
                 )
 
         search_texts = [q['original_question'] for q in questions if q['type'] in ['product', 'content','all']]
@@ -240,18 +258,19 @@ def reply_message(message: str, session_id: str) -> Dict:
         # สร้าง filter conditions จาก price_condition
         filter_conditions = None
         if questions[0]['type'] == 'product':
-            filter_conditions = models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="doctype",
-                        match=models.MatchValue(value="JJ Product")
-                    )
-                ]
-            )
-            # ถ้ามี category filter ให้เพิ่มเข้าไปใน must conditions
-            if category_filter:
-                filter_conditions.must.extend(category_filter.must)
-
+            must_conditions = [
+                models.FieldCondition(
+                    key="doctype",
+                    match=models.MatchValue(value="JJ Product")
+                )
+            ]
+            
+            # เพิ่ม category filter ถ้ามี
+            if category_filter and category_filter.must:
+                must_conditions.extend(category_filter.must)
+                
+            filter_conditions = models.Filter(must=must_conditions)
+        
         price_conditions = [q.get('price_condition') for q in questions if q.get('price_condition')]
         
         if price_conditions:
@@ -317,11 +336,11 @@ def reply_message(message: str, session_id: str) -> Dict:
                 ]
             )
         
-        # ปรับการค้นหาด้วย vector โดยใช้ limit ที่วิเคราะห์ได้
+        # ค้นหาด้วย vector และ filters
         search_results = agent.qdrant.client.search(
             collection_name="jj_data",
             query_vector=vector,
-            limit=result_limit,  # ใช้ limit ที่วิเคราะห์ได้
+            limit=result_limit,
             score_threshold=0.05,
             search_params=models.SearchParams(
                 hnsw_ef=512,
@@ -329,7 +348,24 @@ def reply_message(message: str, session_id: str) -> Dict:
             ),
             query_filter=filter_conditions
         )
-        
+
+        # Log search results for debugging
+        frappe.log_error(
+            title="Search Results Debug",
+            message=f"""
+            Search Query: {questions_text}
+            Filter Conditions: {[
+                f"{cond.key} = {cond.match.any if isinstance(cond.match, models.MatchAny) else cond.match.value}" 
+                for cond in filter_conditions.must
+            ] if filter_conditions else None}
+            Results Count: {len(search_results)}
+            First Result Categories (if any): {
+                search_results[0].payload.get('product_categories') if search_results else 'No results'
+            }
+            Score Threshold: 0.05
+            """
+        )
+
         # แยกประเภทตาม doctype
         product_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Product']
         content_results = [r for r in search_results if r.payload.get('doctype') == 'JJ Content']
