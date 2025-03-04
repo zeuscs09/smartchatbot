@@ -7,7 +7,8 @@
  "field_order": [
   "raw_data",
   "groupid",
-  "userid"
+  "userid",
+  "message_text"
  ],
  "fields": [
   {
@@ -18,17 +19,24 @@
   {
    "fieldname": "groupid",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "GroupId"
   },
   {
    "fieldname": "userid",
    "fieldtype": "Data",
    "label": "UserId"
+  },
+  {
+   "fieldname": "message_text",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Message Text"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-03-04 15:26:07.748986",
+ "modified": "2025-03-04 15:56:08.816978",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Webhook",

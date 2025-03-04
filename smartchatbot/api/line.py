@@ -19,7 +19,7 @@ def webhook():
         # Set the formatted raw data
         doc.raw_data = formatted_data
         
-        # Extract group ID and user ID from the first event if available
+        # Extract group ID, user ID and message text from the first event if available
         events = data.get("events", [])
         if events and "source" in events[0]:
             source = events[0]["source"]
@@ -27,6 +27,10 @@ def webhook():
                 doc.groupid = source["groupId"]
             if "userId" in source:
                 doc.userid = source["userId"]
+            
+            # Extract message text if it's a text message
+            if "message" in events[0] and events[0]["message"]["type"] == "text":
+                doc.message_text = events[0]["message"]["text"]
         
         # Save the document
         doc.insert(ignore_permissions=True)
