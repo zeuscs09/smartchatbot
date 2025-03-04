@@ -9,14 +9,15 @@ def webhook():
         frappe.throw(_("Method not allowed"), frappe.PermissionError)
     
     try:
-        # Get the raw data from the request
+        # Get the raw data from the request and format it nicely
         data = json.loads(frappe.request.data)
+        formatted_data = json.loads(json.dumps(data, indent=4))
         
         # Create new JJ Webhook document
         doc = frappe.new_doc("JJ Webhook")
         
-        # Set the raw data
-        doc.raw_data = data
+        # Set the formatted raw data
+        doc.raw_data = formatted_data
         
         # Extract group ID and user ID from the first event if available
         events = data.get("events", [])
