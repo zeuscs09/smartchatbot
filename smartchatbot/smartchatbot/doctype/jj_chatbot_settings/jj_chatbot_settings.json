@@ -27,7 +27,9 @@
   "line_oa_section",
   "line_channel_id",
   "line_secret",
-  "line_access_token"
+  "line_access_token",
+  "section_break_uegi",
+  "push_message_secret_key"
  ],
  "fields": [
   {
@@ -140,12 +142,21 @@
    "fieldname": "gemini_token",
    "fieldtype": "Password",
    "label": "Gemini Token"
+  },
+  {
+   "fieldname": "push_message_secret_key",
+   "fieldtype": "Small Text",
+   "label": "Push Message Secret Key"
+  },
+  {
+   "fieldname": "section_break_uegi",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-19 11:17:29.255391",
+ "modified": "2025-03-04 17:31:18.380966",
  "modified_by": "Administrator",
  "module": "Smartchatbot",
  "name": "JJ Chatbot Settings",
