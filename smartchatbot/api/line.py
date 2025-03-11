@@ -6,7 +6,9 @@ from linebot.v3.messaging import (
     ApiClient,
     MessagingApi,
     PushMessageRequest,
-    TextMessage
+    TextMessage,
+    FlexMessage,
+    FlexContainer
 )
 
 @frappe.whitelist(allow_guest=True)
@@ -98,7 +100,12 @@ def push_message(channel_id, message, source_id):
         )
         
         # Create message object
-        messages = [TextMessage(text=message)]
+        messages = []
+        for msg in message:
+            if isinstance(msg, str):
+                messages.append(TextMessage(text=msg))
+            elif isinstance(msg, dict) or isinstance(msg, list):
+                messages.append(FlexMessage(alt_text=msg.get("altText"), contents=FlexContainer(type=msg.get("type"), contents=msg.get("contents"))))
         
         # Log request details
         frappe.log_error(
