@@ -55,14 +55,14 @@ def push_message(channel_id, message, source_id):
     Push message to LINE user or group using channel settings and send mapping
     Args:
         channel_id (str): Channel ID from JJ Channel Setting
-        message (str): Message to send
+        message (str or list): Message to send (string or flex message list)
         source_id (str): Source ID to lookup in JJ Send Mapping
     """
     try:
         # Log incoming parameters
         frappe.log_error(
             title="LINE Push Message Debug",
-            message=f"Incoming parameters - Channel: {channel_id}, Source: {source_id}, Message: {message}"
+            message=f"Incoming parameters - Channel: {channel_id}, Source: {source_id}, Message type: {type(message)}"
         )
         
         # Get channel settings
@@ -99,18 +99,31 @@ def push_message(channel_id, message, source_id):
             access_token=channel.channel_secret_key
         )
         
-        # Create message object
+        # Create message objects based on message type
         messages = []
-        for msg in message:
-            if isinstance(msg, str):
-                messages.append(TextMessage(text=msg))
-            elif isinstance(msg, dict) or isinstance(msg, list):
-                messages.append(FlexMessage(alt_text=msg.get("altText"), contents=FlexContainer(type=msg.get("type"), contents=msg.get("contents"))))
+        
+        # Handle different message types
+        if isinstance(message, str):
+            # Simple text message
+            messages.append(TextMessage(text=message))
+        elif isinstance(message, list):
+            # List of messages (like flex messages)
+            for msg in message:
+                if isinstance(msg, dict) and msg.get("type") == "flex":
+                    # Flex message
+                    flex_contents = FlexContainer.from_dict(msg.get("contents"))
+                    messages.append(FlexMessage(
+                        alt_text=msg.get("altText", "Flex Message"),
+                        contents=flex_contents
+                    ))
+                elif isinstance(msg, str):
+                    # Text message in array
+                    messages.append(TextMessage(text=msg))
         
         # Log request details
         frappe.log_error(
             title="LINE Push Message Debug",
-            message=f"Preparing to send message to: {send_to_id}"
+            message=f"Preparing to send {len(messages)} messages to: {send_to_id}"
         )
         
         # Send message using LINE Bot SDK
